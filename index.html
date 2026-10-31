@@ -52,86 +52,192 @@
     <div class="progress" aria-hidden="true"><i id="progress"></i></div>
 
     <div class="verdict" id="verdict" data-state="wait">
-      <div class="verdict-label" aria-hidden="true">Call</div>
+      <div class="verdict-top">
+        <span class="verdict-label" aria-hidden="true">The call</span>
+        <button type="button" class="alert-btn" id="alertBtn" aria-pressed="false">
+          <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 1.5a4.5 4.5 0 0 0-4.5 4.5v2.6L2.2 11h11.6l-1.3-2.4V6A4.5 4.5 0 0 0 8 1.5zM6.3 12.5a1.8 1.8 0 0 0 3.4 0z" fill="currentColor"/></svg>
+          <span id="alertLabel">Alert me</span>
+        </button>
+      </div>
       <p class="verdict-word" id="verdictWord">Wait</p>
       <p class="verdict-sub" id="verdictSub">Loading live prices</p>
     </div>
     <div class="sr-only" id="announce" aria-live="polite" aria-atomic="true"></div>
 
     <dl class="ticket" id="ticket">
-      <div><dt>Stake</dt><dd id="tStake">–</dd></div>
+      <div><dt>Bet</dt><dd id="tStake">–</dd></div>
       <div><dt>Contracts</dt><dd id="tQty">–</dd></div>
-      <div><dt>Pays</dt><dd id="tPays">–</dd></div>
-      <div><dt>Edge</dt><dd id="tEdge">–</dd></div>
+      <div><dt>Pays if right</dt><dd id="tPays">–</dd></div>
+      <div><dt>Advantage</dt><dd id="tEdge">–</dd></div>
     </dl>
+
+    <div class="view-switch" role="group" aria-label="Detail level">
+      <button type="button" id="viewSimple" aria-pressed="true">Simple</button>
+      <button type="button" id="viewPro" aria-pressed="false">Pro</button>
+    </div>
+  </section>
+
+  <section class="card guide" id="guide" aria-labelledby="guideTitle" hidden>
+    <div class="card-head">
+      <h2 id="guideTitle">How to use this desk</h2>
+      <button type="button" class="link" id="guideClose">Got it</button>
+    </div>
+    <ol class="steps">
+      <li><b>Wait for a call.</b> Most rounds say <i>No bet</i>. That's normal: Kalshi's prices are usually fair.</li>
+      <li><b>When it says Buy Up or Buy Down,</b> place that bet in Kalshi for the amount shown under <i>Bet</i>.</li>
+      <li><b>Log it here.</b> Results fill in by themselves. After 30–50 bets you'll know if the edge is real.</li>
+    </ol>
   </section>
 
   <section class="metrics" aria-label="Key numbers">
-    <div class="metric"><span class="m-label" id="lTarget">Target</span><span class="m-value" id="mTarget" aria-describedby="lTarget">–</span><span class="m-note" id="mTargetNote">60s avg at open</span></div>
-    <div class="metric"><span class="m-label" id="lNow">Now</span><span class="m-value" id="mNow" aria-describedby="lNow">–</span><span class="m-note" id="mNowNote">4-exchange median</span></div>
-    <div class="metric"><span class="m-label" id="lGap">Gap</span><span class="m-value" id="mGap" aria-describedby="lGap">–</span><span class="m-note" id="mGapNote">now vs target</span></div>
-    <div class="metric"><span class="m-label" id="lSpeed">Speed</span><span class="m-value" id="mSpeed" aria-describedby="lSpeed">–</span><span class="m-note" id="mSpeedNote">typical move / min</span></div>
+    <div class="metric"><span class="m-label" id="lTarget">Target to beat</span><span class="m-value" id="mTarget" aria-describedby="lTarget">–</span><span class="m-note" id="mTargetNote">set when the window opened</span></div>
+    <div class="metric"><span class="m-label" id="lNow">BTC now</span><span class="m-value" id="mNow" aria-describedby="lNow">–</span><span class="m-note" id="mNowNote">live price</span></div>
+    <div class="metric"><span class="m-label" id="lGap">Distance</span><span class="m-value" id="mGap" aria-describedby="lGap">–</span><span class="m-note" id="mGapNote">now vs target</span></div>
+    <div class="metric"><span class="m-label" id="lSpeed">Typical move</span><span class="m-value" id="mSpeed" aria-describedby="lSpeed">–</span><span class="m-note" id="mSpeedNote">per minute</span></div>
   </section>
 
   <div class="grid">
     <div class="col">
-      <section class="card" aria-labelledby="oddsTitle">
+      <section class="card" aria-labelledby="valueTitle">
         <div class="card-head">
-          <h2 id="oddsTitle">Our odds vs Kalshi</h2>
-          <span class="hint">Buy only when our odds beat the price</span>
+          <h2 id="valueTitle">Is the price right?</h2>
+          <button type="button" class="info-btn" aria-expanded="false" aria-controls="xValue" aria-label="What this shows">?</button>
         </div>
-        <div class="table-scroll">
-          <table class="odds" id="oddsTable">
-            <caption class="sr-only">Our chance for Up and Down compared with Kalshi's price, fee, edge, payout and depth</caption>
-            <thead><tr><td></td><th scope="col" class="up-h">Up</th><th scope="col" class="down-h">Down</th></tr></thead>
-            <tbody>
-              <tr><th scope="row">Our odds</th><td id="oUpP">–</td><td id="oDnP">–</td></tr>
-              <tr><th scope="row">Kalshi ask</th><td id="oUpAsk">–</td><td id="oDnAsk">–</td></tr>
-              <tr><th scope="row">Fee</th><td id="oUpFee">–</td><td id="oDnFee">–</td></tr>
-              <tr class="edge-row"><th scope="row">Edge</th><td id="oUpEdge">–</td><td id="oDnEdge">–</td></tr>
-              <tr><th scope="row">Kalshi pays</th><td id="oUpPay">–</td><td id="oDnPay">–</td></tr>
-              <tr><th scope="row">Fair pays</th><td id="oUpFair">–</td><td id="oDnFair">–</td></tr>
-              <tr><th scope="row">Depth ≤ +5¢</th><td id="oUpDepth">–</td><td id="oDnDepth">–</td></tr>
-            </tbody>
-          </table>
-        </div>
+        <p class="explain" id="xValue" hidden>Kalshi's price is the market's guess at the chance. Our chance comes from how far BTC is from the target and how fast it's moving. A bet is good value only when our chance beats the price plus fee by at least your minimum advantage.</p>
+        <div class="value" id="valueRows"></div>
       </section>
 
-      <section class="card" aria-labelledby="landTitle">
+      <section class="card" aria-labelledby="whyTitle">
         <div class="card-head">
-          <h2 id="landTitle">Where BTC settles</h2>
-          <span class="hint" id="landHint">Forecast of the closing 60-second average</span>
+          <h2 id="whyTitle">Why: the evidence</h2>
+          <button type="button" class="info-btn" aria-expanded="false" aria-controls="xWhy" aria-label="What this shows">?</button>
         </div>
-        <div class="chart" id="landChart" role="img" tabindex="0" aria-label="Forecast distribution of the settlement price" aria-describedby="chartHelp"></div>
-      </section>
-
-      <section class="card" aria-labelledby="pathTitle">
-        <div class="card-head">
-          <h2 id="pathTitle">Odds through this window</h2>
-          <div class="legend" aria-hidden="true">
-            <span><i class="sw sw-model"></i>Our odds</span>
-            <span><i class="sw sw-kalshi"></i>Kalshi</span>
-          </div>
-        </div>
-        <div class="chart" id="oddsChart" role="img" tabindex="0" aria-label="Chance of Up over this window, ours versus Kalshi" aria-describedby="chartHelp"></div>
+        <p class="explain" id="xWhy" hidden>Each signal shows what is pushing BTC right now. Distance to the target and time left decide most 15-minute rounds; the other signals show short-term pressure and can flip quickly. They explain the move, they don't guarantee it.</p>
+        <div class="why-summary" id="whySummary"></div>
+        <ul class="evidence" id="evidence" aria-labelledby="whyTitle"></ul>
       </section>
 
       <section class="card" aria-labelledby="priceTitle">
         <div class="card-head">
           <h2 id="priceTitle">Price vs target</h2>
-          <span class="hint" id="priceHint">This window</span>
+          <button type="button" class="info-btn" aria-expanded="false" aria-controls="xPrice" aria-label="What this shows">?</button>
         </div>
+        <p class="explain" id="xPrice" hidden>The dashed line is the target. If BTC's average over the last minute (the shaded strip) ends at or above it, Up wins. Below it, Down wins.</p>
         <div class="chart" id="priceChart" role="img" tabindex="0" aria-label="BTC price in this window against the target" aria-describedby="chartHelp"></div>
-        <p class="chart-help" id="chartHelp">Touch or hover a chart for values. With a keyboard, focus a chart and use the arrow keys.</p>
+        <p class="chart-help" id="chartHelp">Touch a chart for exact values. With a keyboard, focus a chart and use the arrow keys.</p>
+      </section>
+
+      <section class="card" aria-labelledby="trendTitle">
+        <div class="card-head">
+          <h2 id="trendTitle">Trend &amp; past rounds</h2>
+          <div class="range-switch" role="group" aria-label="Time range">
+            <button type="button" data-range="1h" aria-pressed="true">1H</button>
+            <button type="button" data-range="4h" aria-pressed="false">4H</button>
+            <button type="button" data-range="24h" aria-pressed="false">24H</button>
+          </div>
+        </div>
+        <div class="legend legend-trend" aria-hidden="true">
+          <span><i class="sw sw-price"></i>BTC</span>
+          <span><i class="sw sw-avg"></i>Average</span>
+          <span><i class="sq sq-up"></i>Up round</span>
+          <span><i class="sq sq-down"></i>Down round</span>
+        </div>
+        <div class="chart" id="trendChart" role="img" tabindex="0" aria-label="BTC price trend with past 15-minute round results" aria-describedby="chartHelp"></div>
+        <p class="trend-line" id="trendLine"></p>
+        <dl class="facts" id="roundStats">
+          <div><dt>Up rounds</dt><dd id="rUp">–</dd></div>
+          <div><dt>Average move</dt><dd id="rMove">–</dd></div>
+          <div><dt>Longest streak</dt><dd id="rStreak">–</dd></div>
+          <div><dt>Last round</dt><dd id="rLast">–</dd></div>
+        </dl>
+        <h3 class="sub-h" id="recentTitle">Recent rounds</h3>
+        <ol class="rounds" id="rounds" aria-labelledby="recentTitle"></ol>
+      </section>
+
+      <section class="card pro-only" aria-labelledby="oddsTitle">
+        <div class="card-head">
+          <h2 id="oddsTitle">Full odds table</h2>
+          <button type="button" class="info-btn" aria-expanded="false" aria-controls="xOdds" aria-label="What this shows">?</button>
+        </div>
+        <p class="explain" id="xOdds" hidden>Payout is what $1 returns if you win. Fair payout is what it should be at our chance. Available shows how many contracts you can buy within 5¢ of the best price.</p>
+        <div class="table-scroll">
+          <table class="odds" id="oddsTable">
+            <caption class="sr-only">Our chance for Up and Down compared with Kalshi's price, fee, advantage, payout and depth</caption>
+            <thead><tr><td></td><th scope="col" class="up-h">Up</th><th scope="col" class="down-h">Down</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">Our chance</th><td id="oUpP">–</td><td id="oDnP">–</td></tr>
+              <tr><th scope="row">Kalshi price</th><td id="oUpAsk">–</td><td id="oDnAsk">–</td></tr>
+              <tr><th scope="row">Fee</th><td id="oUpFee">–</td><td id="oDnFee">–</td></tr>
+              <tr class="edge-row"><th scope="row">Advantage</th><td id="oUpEdge">–</td><td id="oDnEdge">–</td></tr>
+              <tr><th scope="row">Kalshi payout</th><td id="oUpPay">–</td><td id="oDnPay">–</td></tr>
+              <tr><th scope="row">Fair payout</th><td id="oUpFair">–</td><td id="oDnFair">–</td></tr>
+              <tr><th scope="row">Available ≤ +5¢</th><td id="oUpDepth">–</td><td id="oDnDepth">–</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card pro-only" aria-labelledby="landTitle">
+        <div class="card-head">
+          <h2 id="landTitle">Where BTC settles</h2>
+          <button type="button" class="info-btn" aria-expanded="false" aria-controls="xLand" aria-label="What this shows">?</button>
+        </div>
+        <p class="explain" id="xLand" hidden>Our forecast of where the closing average will land. The green area is the chance of Up, the red area the chance of Down.</p>
+        <div class="chart" id="landChart" role="img" tabindex="0" aria-label="Forecast distribution of the settlement price" aria-describedby="chartHelp"></div>
+      </section>
+
+      <section class="card pro-only" aria-labelledby="pathTitle">
+        <div class="card-head">
+          <h2 id="pathTitle">Odds through this window</h2>
+          <div class="legend" aria-hidden="true">
+            <span><i class="sw sw-model"></i>Our chance</span>
+            <span><i class="sw sw-kalshi"></i>Kalshi</span>
+          </div>
+        </div>
+        <div class="chart" id="oddsChart" role="img" tabindex="0" aria-label="Chance of Up over this window, ours versus Kalshi" aria-describedby="chartHelp"></div>
       </section>
     </div>
 
     <div class="col">
-      <section class="card" aria-labelledby="kbookTitle">
+      <section class="card" aria-labelledby="logTitle">
+        <div class="card-head">
+          <h2 id="logTitle">Bet log</h2>
+          <button type="button" class="info-btn" aria-expanded="false" aria-controls="xLog" aria-label="What this shows">?</button>
+        </div>
+        <p class="explain" id="xLog" hidden>Place the bet in Kalshi first, then log it here. Each result fills in after its window settles. Expected is what the advantage should earn on average; if Profit keeps up with Expected over many bets, the edge is real.</p>
+        <form class="log-form" id="logForm" novalidate>
+          <div class="stake-field"><label for="logStake">Bet ($)</label>
+          <input id="logStake" type="number" inputmode="decimal" min="0.01" step="0.01" value="2" aria-describedby="stakeMsg"></div>
+          <button type="button" class="btn btn-up" id="logUp" disabled>Log Up</button>
+          <button type="button" class="btn btn-down" id="logDn" disabled>Log Down</button>
+          <p class="field-msg" id="stakeMsg" aria-live="polite"></p>
+        </form>
+        <dl class="facts" id="logSummary">
+          <div><dt>Bets</dt><dd id="sBets">0</dd></div>
+          <div><dt>Won</dt><dd id="sWin">–</dd></div>
+          <div><dt>Profit</dt><dd id="sPnl">$0.00</dd></div>
+          <div><dt>Expected</dt><dd id="sExp">$0.00</dd></div>
+        </dl>
+        <div class="table-scroll">
+          <table class="log" id="logTable">
+            <caption class="sr-only">Logged bets, newest first</caption>
+            <thead><tr><th scope="col">Window</th><th scope="col">Side</th><th scope="col">Price</th><th scope="col">Bet</th><th scope="col">Result</th></tr></thead>
+            <tbody id="logBody"></tbody>
+          </table>
+        </div>
+        <p class="empty" id="logEmpty">No bets logged yet. Your first one appears here.</p>
+        <div class="clear-row">
+          <button type="button" class="link" id="clearLog">Clear log</button>
+          <span id="clearConfirm" hidden>Delete every logged bet? <button type="button" class="link danger" id="clearYes">Delete</button> <button type="button" class="link" id="clearNo">Keep</button></span>
+        </div>
+      </section>
+
+      <section class="card pro-only" aria-labelledby="kbookTitle">
         <div class="card-head">
           <h2 id="kbookTitle">Kalshi liquidity</h2>
-          <span class="hint" id="kbookHint">Contracts you can buy now</span>
+          <button type="button" class="info-btn" aria-expanded="false" aria-controls="xBook" aria-label="What this shows">?</button>
         </div>
+        <p class="explain" id="xBook" hidden>Contracts for sale at each price. Large numbers near the top mean you can buy without pushing the price up.</p>
         <div class="ladders">
           <div class="ladder buy-up">
             <h3 class="ladder-head up-h" id="ladUpH">Buy Up</h3>
@@ -150,21 +256,23 @@
         </dl>
       </section>
 
-      <section class="card" aria-labelledby="spotTitle">
+      <section class="card pro-only" aria-labelledby="spotTitle">
         <div class="card-head">
           <h2 id="spotTitle">Spot order book</h2>
-          <span class="hint">Coinbase + Kraken, BTC resting near price</span>
+          <button type="button" class="info-btn" aria-expanded="false" aria-controls="xSpot" aria-label="What this shows">?</button>
         </div>
+        <p class="explain" id="xSpot" hidden>BTC waiting to be bought (bids) and sold (asks) near the price on Coinbase and Kraken, and who is trading more aggressively right now. Heavy buying can push the price up, heavy selling down.</p>
         <div class="depth" id="depthRows"></div>
         <h3 class="sub-h">Taker flow · Coinbase</h3>
         <div class="depth" id="flowRows"></div>
       </section>
 
-      <section class="card" aria-labelledby="pulseTitle">
+      <section class="card pro-only" aria-labelledby="pulseTitle">
         <div class="card-head">
           <h2 id="pulseTitle">Market pulse</h2>
-          <span class="hint">Derivatives and volatility</span>
+          <button type="button" class="info-btn" aria-expanded="false" aria-controls="xPulse" aria-label="What this shows">?</button>
         </div>
+        <p class="explain" id="xPulse" hidden>Signals from futures markets. Positive funding means traders pay to bet on higher prices. Liquidations are forced exits that can cause sudden moves. Model check compares our chance with Kalshi's.</p>
         <dl class="facts" id="pulse">
           <div><dt>Speed $/min · 15/30/60m</dt><dd id="pSpeed">–</dd></div>
           <div><dt>Implied speed (DVOL)</dt><dd id="pDvol">–</dd></div>
@@ -180,50 +288,17 @@
         <div class="venues" id="venues" aria-label="Exchange prices"></div>
       </section>
 
-      <section class="card" aria-labelledby="logTitle">
-        <div class="card-head">
-          <h2 id="logTitle">Bet log</h2>
-          <span class="hint">Proves whether the edge is real</span>
-        </div>
-        <p class="note">Place the trade in Kalshi first, then log it here. Results fill in automatically after each window settles.</p>
-        <form class="log-form" id="logForm" novalidate>
-          <div class="stake-field"><label for="logStake">Stake ($)</label>
-          <input id="logStake" type="number" inputmode="decimal" min="0.01" step="0.01" value="2" aria-describedby="stakeMsg"></div>
-          <button type="button" class="btn btn-up" id="logUp" disabled>Log Up</button>
-          <button type="button" class="btn btn-down" id="logDn" disabled>Log Down</button>
-          <p class="field-msg" id="stakeMsg" aria-live="polite"></p>
-        </form>
-        <dl class="facts" id="logSummary">
-          <div><dt>Bets</dt><dd id="sBets">0</dd></div>
-          <div><dt>Won</dt><dd id="sWin">–</dd></div>
-          <div><dt>Profit</dt><dd id="sPnl">$0.00</dd></div>
-          <div><dt>Expected</dt><dd id="sExp">$0.00</dd></div>
-        </dl>
-        <div class="table-scroll">
-          <table class="log" id="logTable">
-            <caption class="sr-only">Logged bets, newest first</caption>
-            <thead><tr><th scope="col">Window</th><th scope="col">Side</th><th scope="col">Price</th><th scope="col">Stake</th><th scope="col">Result</th></tr></thead>
-            <tbody id="logBody"></tbody>
-          </table>
-        </div>
-        <p class="empty" id="logEmpty">No bets logged yet. Your first one appears here.</p>
-        <div class="clear-row">
-          <button type="button" class="link" id="clearLog">Clear log</button>
-          <span id="clearConfirm" hidden>Delete every logged bet? <button type="button" class="link danger" id="clearYes">Delete</button> <button type="button" class="link" id="clearNo">Keep</button></span>
-        </div>
-      </section>
-
       <section class="card" aria-labelledby="setTitle">
         <details id="settings">
-          <summary><span class="summary-text"><h2 id="setTitle">Settings</h2><span class="hint">Bankroll, sizing, speed</span></span><span class="summary-icon" aria-hidden="true"></span></summary>
+          <summary><span class="summary-text"><h2 id="setTitle">Settings</h2><span class="hint">Bankroll, bet size, speed</span></span><span class="summary-icon" aria-hidden="true"></span></summary>
           <form class="settings" id="settingsForm" novalidate>
             <label for="sBank">Bankroll ($)<input id="sBank" type="number" inputmode="decimal" min="1" step="1" value="10" aria-describedby="hBank"><span class="help" id="hBank">Money you're willing to put at risk.</span></label>
-            <label for="sKelly">Bet sizing
-              <select id="sKelly" aria-describedby="hKelly"><option value="0.25">Quarter Kelly (safest)</option><option value="0.5">Half Kelly</option><option value="1">Full Kelly (aggressive)</option></select>
-              <span class="help" id="hKelly">Share of the mathematically optimal bet to use.</span>
+            <label for="sKelly">Bet size
+              <select id="sKelly" aria-describedby="hKelly"><option value="0.25">Careful (quarter Kelly)</option><option value="0.5">Balanced (half Kelly)</option><option value="1">Aggressive (full Kelly)</option></select>
+              <span class="help" id="hKelly">How much of the mathematically ideal bet to use.</span>
             </label>
-            <label for="sCap">Max stake (% of bankroll)<input id="sCap" type="number" inputmode="decimal" min="1" max="100" step="1" value="20"></label>
-            <label for="sMinEdge">Minimum edge (points)<input id="sMinEdge" type="number" inputmode="decimal" min="0" max="50" step="0.5" value="5" aria-describedby="hEdge"><span class="help" id="hEdge">A side must beat Kalshi's price by this much.</span></label>
+            <label for="sCap">Max bet (% of bankroll)<input id="sCap" type="number" inputmode="decimal" min="1" max="100" step="1" value="20"></label>
+            <label for="sMinEdge">Minimum advantage (points)<input id="sMinEdge" type="number" inputmode="decimal" min="0" max="50" step="0.5" value="5" aria-describedby="hEdge"><span class="help" id="hEdge">Our chance must beat Kalshi's price by this much.</span></label>
             <label for="sFee">Kalshi fee rate<input id="sFee" type="number" inputmode="decimal" min="0" max="0.2" step="0.005" value="0.07"></label>
             <label for="sSpeedSrc">Speed source
               <select id="sSpeedSrc">
@@ -244,14 +319,16 @@
   </div>
 
   <section class="card rules" aria-labelledby="rulesTitle">
-    <h2 id="rulesTitle">How this market settles</h2>
-    <p id="rulesText">Loading Kalshi's rules…</p>
-    <p class="note">Kalshi settles on CF Benchmarks' BRTI, which isn't public in real time. This desk estimates it as Coinbase plus the gap measured from Kalshi's recent targets, and adds that uncertainty to the odds. Odds are model estimates from recent price movement, not guarantees. Size every bet so a loss doesn't matter.</p>
-    <h3 class="sub-h" id="srcTitle">Data sources</h3>
-    <ul class="sources" id="sources" aria-labelledby="srcTitle"></ul>
+    <details>
+      <summary><span class="summary-text"><h2 id="rulesTitle">How this market settles</h2><span class="hint">Kalshi's rules and our data sources</span></span><span class="summary-icon" aria-hidden="true"></span></summary>
+      <p id="rulesText">Loading Kalshi's rules…</p>
+      <p class="note">Kalshi settles on CF Benchmarks' BRTI, which isn't public in real time. This desk estimates it as Coinbase plus the gap measured from Kalshi's recent targets, and adds that uncertainty to the odds. Our chances are model estimates from recent price movement, not guarantees. Size every bet so a loss doesn't matter.</p>
+      <h3 class="sub-h" id="srcTitle">Data sources</h3>
+      <ul class="sources" id="sources" aria-labelledby="srcTitle"></ul>
+    </details>
   </section>
   <footer class="site-foot">
-    <span>AMAGENCY · Investment Project · Private</span>
+    <span>AMAGENCY · Investment Project · Private · <button type="button" class="link inline" id="guideOpen">Show the guide</button></span>
     <span>Market data: Kalshi, Coinbase, Kraken, Bitstamp, Gemini, Deribit, Hyperliquid</span>
   </footer>
 </main>

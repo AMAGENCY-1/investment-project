@@ -3,6 +3,21 @@
 Private AMAGENCY tool: live odds, liquidity and edge for Kalshi's **BTC 15-minute** markets (series `KXBTC15M`).
 It has its own GitHub repo and its own Vercel project (`investment-project`), separate from every client project.
 
+## Simple and Pro
+**Simple** (default) shows what you need to act: the call with a plain-English reason, *Is the price right?*
+(our chance vs Kalshi's price for each side), *Why: the evidence*, *Price vs target*, *Trend & past rounds*,
+the bet log and settings. **Pro** adds the full odds table, forecast and odds-over-time charts, Kalshi and spot
+order books, and market pulse. Every card has a **?** that explains it in one sentence.
+
+**Why: the evidence** lists each signal (distance to target, 5-minute momentum, 1-hour trend, order book,
+who is trading, forced exits, futures positioning, Kalshi traders, past rounds), says which way it points and how
+strongly, and tallies them. Distance and time decide most rounds; the rest is short-term pressure.
+
+**Trend & past rounds** charts BTC over 1H / 4H / 24H with a moving average, shades every past 15-minute
+round green (Up) or red (Down), and lists the last nine results with how far each one finished from its target.
+
+**Alerts**: tap *Alert me* for a chime and vibration whenever a Buy call appears; the tab title also flags it.
+
 ## What it shows
 - **The call**: Buy Up, Buy Down, Skip or Check data, with stake, contracts and edge.
 - **Our odds vs Kalshi**: model probability, Kalshi ask, fee, edge, fair vs Kalshi payout, buyable depth.
@@ -20,6 +35,10 @@ It has its own GitHub repo and its own Vercel project (`investment-project`), se
 
 ## Speed
 - BTC price streams tick-by-tick straight from Coinbase over WebSocket; the numbers repaint up to 4x a second.
+- Charts and odds load from a small trend feed (~0.7 s to first evidence); heavier order-book data loads alongside.
+  The last trend data is kept on the device, so charts appear instantly when you reopen the app.
+- In the background the app sleeps (stream closed, polling paused) unless alerts are on; charts are drawn only
+  when they're on screen.
 - Kalshi's order book refreshes every second. The server keeps market details and spot prices warm in memory,
   so a typical refresh is a single upstream call. Functions run in `iad1` (US East), next to Kalshi and Coinbase.
 - The header shows the live round-trip time. If the stream drops, the app falls back to 1-second polling and reconnects.
@@ -47,7 +66,8 @@ If our odds and Kalshi's differ by more than 25 points the call is **Check data*
 | Route | Refresh | Data |
 |---|---|---|
 | `/api/live` | 1s | open market, order book, spot prices, timing |
-| `/api/context` | 15s | speed, calibration, spot depth, taker flow, Deribit, Hyperliquid, liquidations |
+| `/api/trend` | 30s | 1-min and 5-min candles, speed, calibration, last 24h of Kalshi results |
+| `/api/context` | 15s | spot depth, taker flow, Deribit, Hyperliquid, implied volatility, liquidations |
 | `/api/history` | once per window | Kalshi minute prices for back-fill |
 | `/api/result` | 30s | settlement of logged bets |
 | `/api/health` | on demand | latency and status of every upstream, including the Coinbase stream |

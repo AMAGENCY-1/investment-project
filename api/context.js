@@ -1,33 +1,10 @@
-// Slow feed (polled every ~15s): how fast BTC is moving, spot order-book depth,
-// taker flow, derivatives funding / open interest, and recent liquidations.
-const { getJSON, settle, num, median, send, allowGet, KALSHI, SERIES } = require('./_lib');
+// Liquidity feed (polled every ~15s): spot order-book depth, taker flow,
+// derivatives funding / open interest, implied volatility and recent liquidations.
+// Cached briefly in the warm instance so several viewers share one fetch.
+const { getJSON, settle, num, send, allowGet } = require('./_lib');
 
-const rms = (a) => (a.length ? Math.sqrt(a.reduce((t, x) => t + x * x, 0) / a.length) : null);
-
-function speedFromCandles(candles) {
-  // Coinbase candles: [time, low, high, open, close, volume], newest first.
-  const c = (candles || []).slice().sort((a, b) => a[0] - b[0]);
-  const closes = c.map((r) => r[4]);
-  const diffs = closes.slice(1).map((v, i) => v - closes[i]);
-  const last = (n) => diffs.slice(-n);
-  const price = closes[closes.length - 1] || null;
-  // Parkinson estimator from each minute's high/low (uses intraminute range).
-  const park = (n) => {
-    const rows = c.slice(-n).filter((r) => r[2] > 0 && r[1] > 0);
-    if (!rows.length || !price) return null;
-    const v = rows.reduce((t, r) => t + Math.log(r[2] / r[1]) ** 2, 0) / rows.length / (4 * Math.log(2));
-    return Math.sqrt(v) * price;
-  };
-  return {
-    price,
-    m15: rms(last(15)),
-    m30: rms(last(30)),
-    m60: rms(last(60)),
-    m120: rms(last(120)),
-    park30: park(30),
-    bars: c.slice(-90).map((r) => [r[0], r[3], r[2], r[1], r[4]]), // [t, o, h, l, c]
-  };
-}
+const cache = { data: null, at: 0 };
+const TTL = 6000;
 
 function depth(bids, asks, mid) {
   const bands = [0.0005, 0.001, 0.0025, 0.005];
@@ -75,35 +52,11 @@ function liquidations(trades, nowMs) {
   return { windowMin: 15, longUsd, shortUsd, count, recent: recent.slice(0, 8) };
 }
 
-// Kalshi settles on CF Benchmarks BRTI, which runs a few dollars off Coinbase.
-// Each window's target is the BRTI average of the minute before it opened, so
-// comparing recent targets with Coinbase's candle for that minute measures the gap.
-function calibrate(markets, candles, nowMs) {
-  const bars = new Map((candles || []).map((r) => [r[0], r])); // [time, low, high, open, close, volume]
-  const points = [];
-  for (const m of markets || []) {
-    const target = num(m.floor_strike);
-    const openMs = Date.parse(m.open_time);
-    if (!Number.isFinite(target) || !(openMs <= nowMs)) continue;
-    const r = bars.get(openMs / 1000 - 60);
-    if (!r) continue;
-    const avg = (r[1] + r[2] + r[3] + r[4]) / 4;
-    points.push({ open: m.open_time, target, cbAvg: avg, basis: target - avg });
-  }
-  points.sort((a, b) => Date.parse(b.open) - Date.parse(a.open));
-  const use = points.slice(0, 8);
-  if (!use.length) return null;
-  const basis = median(use.map((p) => p.basis));
-  const spread = use.length > 1 ? Math.sqrt(use.reduce((t, p) => t + (p.basis - basis) ** 2, 0) / (use.length - 1)) : null;
-  return { basis, spread, n: use.length, points: use };
-}
-
 module.exports = async (req, res) => {
   if (!allowGet(req, res)) return;
   const now = Date.now();
+  if (cache.data && now - cache.at < TTL) return send(res, { ...cache.data, serverTime: now }, 10);
   const { out, errors } = await settle({
-    candles: getJSON('https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=60'),
-    recent: getJSON(`${KALSHI}/markets?series_ticker=${SERIES}&min_close_ts=${Math.floor(now / 1000) - 7200}&max_close_ts=${Math.floor(now / 1000) + 1800}&limit=20`),
     cbBook: getJSON('https://api.exchange.coinbase.com/products/BTC-USD/book?level=2', { timeout: 7000 }),
     krBook: getJSON('https://api.kraken.com/0/public/Depth?pair=XBTUSD&count=500'),
     trades: getJSON('https://api.exchange.coinbase.com/products/BTC-USD/trades?limit=1000'),
@@ -115,8 +68,7 @@ module.exports = async (req, res) => {
     }),
   });
 
-  const speed = out.candles ? speedFromCandles(out.candles) : null;
-  const ref = (speed && speed.price) || null;
+  const ref = out.perp && out.perp.result ? num(out.perp.result.index_price) : null;
 
   // Spot depth: Coinbase + Kraken combined.
   let book = null;
@@ -161,7 +113,7 @@ module.exports = async (req, res) => {
     }
   }
 
-  const calib = out.candles && out.recent ? calibrate(out.recent.markets, out.candles, now) : null;
-
-  send(res, { serverTime: now, speed, calib, dvol, book, flow, deribit, hyper, liq, errors }, 10);
+  const data = { serverTime: now, dvol, book, flow, deribit, hyper, liq, errors };
+  if (book || deribit) { cache.data = data; cache.at = now; }
+  send(res, data, 10);
 };

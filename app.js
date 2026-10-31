@@ -1,5 +1,5 @@
 /* Investment Project client: streams Coinbase ticks over WebSocket, polls
-   /api/live (1s) and /api/context (15s), prices the
+   /api/live (1s), /api/trend (30s) and /api/context (15s), prices the
    Kalshi BTC 15-minute market with a random-walk model of the settlement
    average, and shows where our odds and Kalshi's price disagree. */
 (() => {
@@ -8,6 +8,7 @@
   const LIVE_MS = 1000;
   const STREAM_URL = 'wss://ws-feed.exchange.coinbase.com';
   const CONTEXT_MS = 15000;
+  const TREND_MS = 30000;
   const RESULT_MS = 30000;
   const AVG_WINDOW = 60; // Kalshi settles on a 60-second average of BRTI
   const $ = (id) => document.getElementById(id);
@@ -106,9 +107,14 @@
 
   // ---------- state ----------
   const state = {
-    live: null, ctx: null, offset: 0, lastOk: 0, everOk: false,
+    live: null, ctx: null, trend: null, offset: 0, lastOk: 0, everOk: false,
     ticker: null, series: [], history: [], view: null,
   };
+  // Paint charts instantly on reopen with the last trend data (refreshed right after).
+  (() => {
+    const cached = store.get('ip.trend', null);
+    if (cached && Date.now() - cached.serverTime < 20 * 60 * 1000) state.trend = cached;
+  })();
   const serverNow = () => Date.now() + state.offset;
 
   function kalshiMid(live) {
@@ -123,7 +129,7 @@
   function indexEstimate(live) {
     const spot = live && live.spot;
     if (!spot) return { price: null };
-    const cal = state.ctx && state.ctx.calib;
+    const cal = state.trend && state.trend.calib;
     const cb = spot.venues.find((x) => x.name === 'Coinbase');
     if (cal && finite(cal.basis)) {
       const base = streamFresh() ? stream.price : cb ? cb.mid : spot.composite;
@@ -133,7 +139,7 @@
   }
 
   function chooseSpeed() {
-    const s = state.ctx && state.ctx.speed;
+    const s = state.trend && state.trend.speed;
     const price = state.live && state.live.spot && state.live.spot.composite;
     const blend = () => {
       const v = s ? [s.m15, s.m30, s.m60].filter(finite) : [];
@@ -152,7 +158,7 @@
   }
 
   // ---------- live stream (Coinbase ticker over WebSocket) ----------
-  const stream = { price: null, t: 0, open: false, retries: 0, ws: null };
+  const stream = { price: null, t: 0, open: false, retries: 0, ws: null, paused: false };
   const streamFresh = () => stream.open && Date.now() - stream.t < 5000 && finite(stream.price);
   function connectStream() {
     if (!('WebSocket' in window)) return;
@@ -172,12 +178,21 @@
       stream.price = px; stream.t = Date.now();
       scheduleFast();
     };
-    ws.onclose = () => { stream.open = false; if (stream.ws === ws) retryStream(); };
+    ws.onclose = () => { stream.open = false; if (stream.ws === ws && !stream.paused) retryStream(); };
     ws.onerror = () => { try { ws.close(); } catch { /* already closed */ } };
   }
   function retryStream() {
     const wait = Math.min(30000, 1000 * 2 ** stream.retries++);
-    setTimeout(connectStream, wait);
+    setTimeout(() => { if (!stream.paused) connectStream(); }, wait);
+  }
+  function pauseStream() {
+    stream.paused = true;
+    if (stream.ws) { try { stream.ws.close(); } catch { /* closed */ } }
+  }
+  function resumeStream() {
+    if (!stream.paused) return;
+    stream.paused = false; stream.retries = 0;
+    connectStream();
   }
 
   // Ticks arrive many times a second; repaint the numbers at most 4x/second.
@@ -209,6 +224,16 @@
     } finally {
       livePending = false;
     }
+  }
+
+  async function pollTrend() {
+    try {
+      const r = await fetch('/api/trend', { cache: 'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      state.trend = await r.json();
+      store.set('ip.trend', state.trend);
+      render();
+    } catch (e) { /* keep last trend */ }
   }
 
   async function pollContext() {
@@ -289,6 +314,8 @@
     };
     v.up = side(v.pUp, v.upAsk);
     v.dn = side(1 - v.pUp, v.dnAsk);
+    // A huge gap between us and Kalshi almost always means bad data, not a real chance.
+    v.dataGap = finite(v.mid) && Math.abs(v.pUp - v.mid) > 0.25;
 
     // Speed Kalshi's price implies (only meaningful away from 50/50 and the final minute).
     if (finite(v.mid) && v.mid > 0.03 && v.mid < 0.97 && secsLeft > 90) {
@@ -302,14 +329,17 @@
   }
 
   // ---------- render ----------
+  const isPro = () => document.documentElement.dataset.view === 'pro';
+
   function render() {
     const v = compute();
     state.view = v;
     renderHero(v);
     renderMetrics(v);
-    renderOdds(v);
-    renderLadders();
-    renderContext(v);
+    renderValue(v);
+    renderEvidence(v);
+    renderRounds();
+    if (isPro()) { renderOdds(v); renderLadders(); renderContext(v); }
     renderCharts(v);
     renderRules();
     renderSources();
@@ -322,8 +352,64 @@
     state.view = v;
     renderHero(v);
     renderMetrics(v);
-    renderOdds(v);
+    renderValue(v);
+    if (isPro()) renderOdds(v);
     renderLogButtons(v);
+  }
+
+  // ---------- "Is the price right?" ----------
+  function renderValue(v) {
+    const box = $('valueRows');
+    box.textContent = '';
+    if (!v || !v.f) {
+      const p = document.createElement('p'); p.className = 'value-empty';
+      p.textContent = 'Appears once the window has a target and live prices.';
+      box.appendChild(p);
+      return;
+    }
+    const min = settings.minEdge / 100;
+    for (const [key, s, name] of [['up', v.up, 'Up'], ['down', v.dn, 'Down']]) {
+      const row = document.createElement('div'); row.className = 'vrow';
+      const head = document.createElement('div'); head.className = 'vhead';
+      const side = document.createElement('span'); side.className = 'vside ' + (key === 'up' ? 'up-h' : 'down-h'); side.textContent = name;
+      const chip = document.createElement('span');
+      if (s.ask === null) { chip.className = 'chip fair'; chip.textContent = 'No offers'; }
+      else if (v.dataGap) { chip.className = 'chip fair'; chip.textContent = 'Check data'; }
+      else if (s.edge >= min) { chip.className = 'chip ok'; chip.textContent = 'Good value · ' + pts(s.edge); }
+      else if (s.edge <= -min) { chip.className = 'chip bad'; chip.textContent = 'Overpriced · ' + pts(s.edge); }
+      else { chip.className = 'chip fair'; chip.textContent = 'About fair · ' + pts(s.edge); }
+      head.append(side, chip);
+      const bar = (label, frac, cls, text) => {
+        const r = document.createElement('div'); r.className = 'vbar';
+        const l = document.createElement('span'); l.className = 'vlab'; l.textContent = label;
+        const t = document.createElement('span'); t.className = 'track'; t.setAttribute('aria-hidden', 'true');
+        const f = document.createElement('i'); f.className = cls; f.style.width = (clamp(frac, 0, 1) * 100).toFixed(1) + '%';
+        t.appendChild(f);
+        const n = document.createElement('span'); n.className = 'vnum'; n.textContent = text;
+        r.append(l, t, n);
+        return r;
+      };
+      row.append(head, bar('Our chance', s.p, key === 'up' ? 'ours-up' : 'ours-down', odds(s.p)));
+      if (s.ask !== null) row.appendChild(bar('Kalshi price', s.cost, 'price', cents(s.ask)));
+      box.appendChild(row);
+    }
+  }
+
+  // One or two plain sentences: where BTC is, what we think, what Kalshi charges.
+  function plainWhy(v, best, buying) {
+    const gap = v.price - v.target;
+    const where = Math.abs(gap) < 1 ? 'right at' : `${usd(Math.abs(gap), 0)} ${gap > 0 ? 'above' : 'below'}`;
+    const left = v.secsLeft >= 90 ? `${Math.round(v.secsLeft / 60)} min left` : `${Math.round(v.secsLeft)} sec left`;
+    const lead = `BTC is ${where} the target with ${left}.`;
+    if (!best) return lead + ' Kalshi has no offers right now.';
+    const [key, s] = best;
+    const name = key === 'up' ? 'Up' : 'Down';
+    if (buying) return `${lead} We give ${name} ${odds(s.p)} and Kalshi charges ${cents(s.ask)}: ${pts(s.edge)} in your favor.`;
+    if (s.edge >= settings.minEdge / 100) return `${lead} ${name} is good value, but one contract costs more than your bankroll allows.`;
+    const fav = v.up.p >= v.dn.p ? v.up : v.dn;
+    const favName = fav === v.up ? 'Up' : 'Down';
+    if (fav.ask === null) return `${lead} We give ${favName} ${odds(fav.p)}, but Kalshi has no offers for it.`;
+    return `${lead} We give ${favName} ${odds(fav.p)} and Kalshi charges ${cents(fav.ask)}, so neither side is a bargain.`;
   }
 
   let lastSpoken = null;
@@ -333,7 +419,7 @@
       setText('windowLabel', state.everOk ? 'Between windows' : 'Finding the live window…');
       verdict.dataset.state = 'wait';
       setText('verdictWord', 'Wait');
-      setText('verdictSub', state.everOk ? 'The next 15-minute window opens shortly.' : 'Loading live prices');
+      setText('verdictSub', state.everOk ? 'The next 15-minute window opens shortly.' : 'Loading live prices…');
       ['tStake', 'tQty', 'tPays', 'tEdge'].forEach((id) => setText(id, '–', ''));
       return;
     }
@@ -349,31 +435,34 @@
     const cands = [['up', v.up], ['down', v.dn]].filter(([, s]) => s.ask !== null);
     cands.sort((a, b) => b[1].edge - a[1].edge);
     const best = cands[0];
-    let stateName = 'skip', word = 'Skip', sub;
+    let stateName = 'skip', word = 'No bet', sub;
     if (v.secsLeft <= 5) {
-      word = 'Closed'; stateName = 'wait'; sub = 'Window is settling. Next one opens at ' + et(v.closeMs) + '.';
-    } else if (!best) {
-      sub = 'No asks on Kalshi right now.';
-    } else if (finite(v.mid) && Math.abs(v.pUp - v.mid) > 0.25) {
+      word = 'Settling'; stateName = 'wait'; sub = 'This window is closing. The next one opens at ' + et(v.closeMs) + '.';
+    } else if (v.dataGap) {
       word = 'Check data';
-      sub = `Our odds and Kalshi are ${Math.abs((v.pUp - v.mid) * 100).toFixed(0)} pts apart. Kalshi sees the real index, so this is more likely a data gap than an edge.`;
-    } else if (best[1].edge >= min && best[1].qty >= 1) {
+      sub = `Our chance and Kalshi's price are ${Math.abs((v.pUp - v.mid) * 100).toFixed(0)} points apart. Kalshi sees the real index, so this is more likely a data gap than a real chance.`;
+    } else if (best && best[1].edge >= min && best[1].qty >= 1) {
       stateName = best[0]; word = best[0] === 'up' ? 'Buy Up' : 'Buy Down';
-      sub = `Our odds ${odds(best[1].p)} vs Kalshi ${cents(best[1].ask)} + fee`;
-    } else if (best[1].edge >= min) {
-      sub = `${best[0] === 'up' ? 'Up' : 'Down'} has an edge, but your bankroll is too small for one contract.`;
+      sub = plainWhy(v, best, true);
     } else {
-      sub = `Best is ${best[0] === 'up' ? 'Up' : 'Down'} at ${pts(best[1].edge)}, under your ${settings.minEdge} pt bar.`;
+      sub = plainWhy(v, best, false);
     }
     verdict.dataset.state = stateName;
     setText('verdictWord', word);
     setText('verdictSub', sub);
-    if (word !== lastSpoken) { lastSpoken = word; setText('announce', `Call: ${word}. ${sub || ''}`); }
+    if (word !== lastSpoken) {
+      const wasBuy = /^Buy/.test(lastSpoken || '');
+      lastSpoken = word;
+      setText('announce', `Call: ${word}. ${sub || ''}`);
+      if (/^Buy/.test(word) && !wasBuy) notifyBuy(word);
+      document.title = /^Buy/.test(word) ? `● ${word} · Investment Project` : 'Investment Project';
+    }
     const s = stateName === 'up' ? v.up : stateName === 'down' ? v.dn : null;
     setText('tStake', s ? usd(s.stake) : '$0', '');
     setText('tQty', s ? String(s.qty) : '0', '');
     setText('tPays', s ? usd(s.qty) : '–', '');
-    setText('tEdge', best ? pts(best[1].edge) : '–', best ? signClass(best[1].edge) : '');
+    const showEdge = best && !v.dataGap && v.secsLeft > 5;
+    setText('tEdge', showEdge ? pts(best[1].edge) : '–', showEdge ? signClass(best[1].edge) : '');
     syncStakeInput(s);
   }
 
@@ -384,11 +473,11 @@
     setText('mNow', usd(v.price));
     const gap = finite(v.price) && finite(v.target) ? v.price - v.target : null;
     setText('mGap', sUsd(gap), signClass(gap));
-    setText('mGapNote', finite(gap) ? (gap >= 0 ? 'above target' : 'below target') : 'now vs target');
-    setText('mSpeed', v.speed ? usd(v.speed.v, 0) + '/min' : '–');
-    setText('mSpeedNote', v.speed ? v.speed.label : 'typical move / min');
-    if (v.est && v.est.calibrated) setText('mNowNote', `index est. · Coinbase ${sUsd(v.est.basis)}`);
-    else if (live && live.spot) setText('mNowNote', `${live.spot.venues.length}-exchange median`);
+    setText('mGapNote', finite(gap) ? (gap >= 0 ? 'above target · Up winning' : 'below target · Down winning') : 'now vs target');
+    setText('mSpeed', v.speed ? '±' + usd(v.speed.v, 0) : '–');
+    setText('mSpeedNote', 'per minute, recently');
+    if (v.est && v.est.calibrated) setText('mNowNote', 'live, matched to Kalshi\u2019s index');
+    else if (live && live.spot) setText('mNowNote', 'live price');
   }
 
   function renderOdds(v) {
@@ -493,7 +582,7 @@
       flowEl.appendChild(splitRow('5 min', c.flow.m5.buy, c.flow.m5.sell));
     } else flowEl.textContent = 'Trade flow unavailable.';
 
-    const s = c.speed;
+    const s = state.trend && state.trend.speed;
     setText('pSpeed', s ? [s.m15, s.m30, s.m60].map((x) => usd(x, 0)).join(' · ') : '–');
     const price = state.live && state.live.spot.composite;
     setText('pDvol', finite(c.dvol) && price ? `${c.dvol.toFixed(1)} → ${usd((c.dvol / 100) * price / Math.sqrt(525600), 0)}/min` : '–');
@@ -517,11 +606,12 @@
       sm.textContent = `Ours ${odds(v.pUp)} · Kalshi ${pct(v.mid, 0)}` + (Math.abs(gap) > 0.15 ? '. Big gap: double-check before betting.' : '');
       el.appendChild(sm);
     } else setText('pCheck', '–');
-    if (c.calib && finite(c.calib.basis)) {
+    const cal = state.trend && state.trend.calib;
+    if (cal && finite(cal.basis)) {
       const el = $('pCal');
-      el.textContent = `Coinbase ${sUsd(c.calib.basis)}`;
+      el.textContent = `Coinbase ${sUsd(cal.basis)}`;
       const sm = document.createElement('small');
-      sm.textContent = `from the last ${c.calib.n} Kalshi targets` + (finite(c.calib.spread) ? `, ±${usd(c.calib.spread)}` : '');
+      sm.textContent = `from the last ${cal.n} Kalshi targets` + (finite(cal.spread) ? `, ±${usd(cal.spread)}` : '');
       el.appendChild(sm);
     } else setText('pCal', 'not calibrated yet');
     const spot = state.live && state.live.spot;
@@ -542,8 +632,8 @@
   }
 
   const SOURCE_NAMES = {
-    markets: 'Kalshi markets', recent: 'Kalshi targets', orderbook: 'Kalshi book', coinbase: 'Coinbase', kraken: 'Kraken', bitstamp: 'Bitstamp', gemini: 'Gemini',
-    candles: 'Coinbase candles', cbBook: 'Coinbase book', krBook: 'Kraken book', trades: 'Coinbase trades', perp: 'Deribit perp',
+    markets: 'Kalshi markets', orderbook: 'Kalshi book', coinbase: 'Coinbase', kraken: 'Kraken', bitstamp: 'Bitstamp', gemini: 'Gemini',
+    c1: 'Coinbase candles', c5: 'Coinbase 5-min candles', rounds: 'Kalshi history', cbBook: 'Coinbase book', krBook: 'Kraken book', trades: 'Coinbase trades', perp: 'Deribit perp',
     perpTrades: 'Deribit trades', dvol: 'Deribit DVOL', hl: 'Hyperliquid',
   };
   function renderSources() {
@@ -552,7 +642,7 @@
     sc.textContent = (streamFresh() ? '✓ ' : '✕ ') + 'Coinbase stream';
     if (!streamFresh()) { sc.classList.add('bad'); sc.title = 'Using 1-second polling instead'; }
     el.appendChild(sc);
-    const errs = { ...((state.live && state.live.errors) || {}), ...((state.ctx && state.ctx.errors) || {}) };
+    const errs = { ...((state.live && state.live.errors) || {}), ...((state.ctx && state.ctx.errors) || {}), ...((state.trend && state.trend.errors) || {}) };
     Object.entries(SOURCE_NAMES).forEach(([k, name]) => {
       const s = document.createElement('li');
       const bad = k in errs;
@@ -604,7 +694,11 @@
   function empty(container, msg) {
     container.textContent = '';
     container.__move = null;
-    const p = document.createElement('p'); p.className = 'chart-empty'; p.textContent = msg; container.appendChild(p);
+    const loading = !state.everOk || !state.trend;
+    const p = document.createElement('p');
+    p.className = loading ? 'skeleton' : 'chart-empty';
+    p.textContent = loading ? 'Loading live data…' : msg;
+    container.appendChild(p);
   }
   const tip = $('tip');
   // lines: [[part, ...], ...]; part = 'text' | { b: 'bold' } | { sw: color }
@@ -639,10 +733,22 @@
     svg.addEventListener('pointerleave', () => { pointer = null; hideTip(); cleanup(); });
   }
 
+  // Draw a chart only when it's shown and near the screen; catch up when it scrolls in.
+  const chartSeen = {};
+  const chartObserver = 'IntersectionObserver' in window
+    ? new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        chartSeen[e.target.id] = e.isIntersecting;
+        if (e.isIntersecting && state.view && e.target.offsetParent !== null) CHARTS[e.target.id](state.view);
+      }
+    }, { rootMargin: '240px 0px' })
+    : null;
   function renderCharts(v) {
-    renderLanding(v);
-    renderOddsChart(v);
-    renderPriceChart(v);
+    for (const id of Object.keys(CHARTS)) {
+      const box = $(id);
+      if (box.offsetParent === null || chartSeen[id] === false) continue;
+      CHARTS[id](v);
+    }
     if (pointer) {
       const box = $(pointer.id);
       if (box && box.__move && box.querySelector('svg')) box.__move(pointer); else hideTip();
@@ -710,7 +816,7 @@
     const live = state.series.filter((p) => p.t >= v.openMs && p.t <= v.closeMs);
     const firstLive = live.length ? live[0].t : Infinity;
     const model = [], kal = [];
-    const bars = (state.ctx && state.ctx.speed && state.ctx.speed.bars) || [];
+    const bars = (state.trend && state.trend.bars) || [];
     if (v.speed && finite(v.target)) {
       const basis = (v.est && v.est.calibrated && v.est.basis) || 0;
       for (const [t, , , , c0] of bars) {
@@ -788,7 +894,7 @@
     if (!v || !v.m || !finite(v.target)) { empty(box, 'Waiting for the target price.'); return; }
     const live = state.series.filter((p) => p.t >= v.openMs && p.t <= v.closeMs && finite(p.price)).map((p) => [p.t, p.price]);
     const firstLive = live.length ? live[0][0] : Infinity;
-    const bars = (state.ctx && state.ctx.speed && state.ctx.speed.bars) || [];
+    const bars = (state.trend && state.trend.bars) || [];
     const basis = (v.est && v.est.calibrated && v.est.basis) || 0;
     const back = bars.map(([t, , , , c]) => [(t + 60) * 1000, c + basis]).filter(([t]) => t > v.openMs && t < firstLive);
     const pts3 = back.concat(live);
@@ -827,6 +933,293 @@
       showTip(e, [[et(a[0], { second: '2-digit' })], [{ b: usd(a[1]) }], [sUsd(a[1] - v.target) + ' vs target']]);
     }, () => cross.setAttribute('visibility', 'hidden'));
   }
+
+  // ---------- evidence: what is pushing BTC right now ----------
+  const WEIGHT = { strong: 2, moderate: 1, weak: 0.5 };
+  function evidenceList(v) {
+    const items = [];
+    const add = (title, dir, strength, text, context) => items.push({ title, dir, strength, text, context });
+    const T = state.trend, c = state.ctx;
+    const basis = (v.est && v.est.calibrated && v.est.basis) || 0;
+    const speed = v.speed ? v.speed.v : null;
+    const bars = (T && T.bars) || [];
+
+    const gap = v.price - v.target;
+    const z = Math.abs(v.f.mean - v.target) / v.f.sd;
+    const left = v.secsLeft >= 90 ? `${Math.round(v.secsLeft / 60)} min` : `${Math.round(v.secsLeft)} sec`;
+    const fav = v.pUp >= 0.5 ? 'Up' : 'Down';
+    if (Math.abs(gap) < 0.5) add('Distance to target', 'flat', 'weak', `BTC is right at the target with ${left} left, so it's close to a coin flip.`);
+    else add('Distance to target', gap > 0 ? 'up' : 'down', z >= 1 ? 'strong' : z >= 0.4 ? 'moderate' : 'weak',
+      `BTC is ${usd(Math.abs(gap), 0)} ${gap > 0 ? 'above' : 'below'} the target with ${left} left. On distance and speed alone, ${fav} wins about ${odds(Math.max(v.pUp, 1 - v.pUp))} of the time.`);
+
+    if (bars.length > 6 && speed) {
+      const d = v.price - (bars[bars.length - 6][4] + basis);
+      const th = speed * Math.sqrt(5);
+      const quiet = Math.abs(d) < th * 0.35;
+      add('Momentum · 5 min', quiet ? 'flat' : d > 0 ? 'up' : 'down', Math.abs(d) >= th ? 'moderate' : 'weak',
+        `${d >= 0 ? 'Up' : 'Down'} ${usd(Math.abs(d), 0)} in the last 5 minutes${quiet ? ', which is ordinary noise' : d > 0 ? ', so buyers have the short-term push' : ', so sellers have the short-term push'}.`);
+    }
+    if (bars.length >= 60 && speed) {
+      const d = v.price - (mean(bars.slice(-60).map((b) => b[4])) + basis);
+      const th = speed * 2;
+      const flat = Math.abs(d) < th * 0.5;
+      add('Trend · 1 hour', flat ? 'flat' : d > 0 ? 'up' : 'down', Math.abs(d) >= th * 1.5 ? 'moderate' : 'weak',
+        `BTC is ${usd(Math.abs(d), 0)} ${d >= 0 ? 'above' : 'below'} its 1-hour average${flat ? ', with no clear trend' : d > 0 ? ': buyers have been in control' : ': sellers have been in control'}.`);
+    }
+    if (c && c.book && c.book.bands[1]) {
+      const b = c.book.bands[1], tot = b.bid + b.ask, share = tot ? b.bid / tot : 0.5;
+      add('Order book', share > 0.58 ? 'up' : share < 0.42 ? 'down' : 'flat', Math.abs(share - 0.5) > 0.15 ? 'moderate' : 'weak',
+        `${Math.round(share * 100)}% of orders near the price are buyers waiting${share > 0.58 ? ', so there is more support below than supply above' : share < 0.42 ? ', so there is more supply above than support below' : ', a balanced book'}.`);
+    }
+    if (c && c.flow && c.flow.m5.buy + c.flow.m5.sell > 0) {
+      const share = c.flow.m5.buy / (c.flow.m5.buy + c.flow.m5.sell);
+      add('Who is trading · 5 min', share > 0.6 ? 'up' : share < 0.4 ? 'down' : 'flat', Math.abs(share - 0.5) > 0.2 ? 'moderate' : 'weak',
+        `Buyers made ${Math.round(share * 100)}% of Coinbase trades in the last 5 minutes${share > 0.6 ? ', pushing the price up' : share < 0.4 ? ', so sellers are pushing the price down' : ', an even split'}.`);
+    }
+    if (c && c.liq) {
+      const L = c.liq.longUsd, S = c.liq.shortUsd, tot = L + S;
+      if (tot < 50000) add('Forced exits · 15 min', 'flat', 'weak', 'Few liquidations on Deribit lately, so no forced buying or selling.');
+      else add('Forced exits · 15 min', L > S * 1.5 ? 'down' : S > L * 1.5 ? 'up' : 'flat', tot > 500000 ? 'moderate' : 'weak',
+        `$${compact(L)} of longs and $${compact(S)} of shorts were forced out on Deribit${L > S * 1.5 ? ', which means forced selling' : S > L * 1.5 ? ', which means forced buying' : ''}.`);
+    }
+    if (c && c.deribit && finite(c.deribit.funding8h)) {
+      const fr = c.deribit.funding8h;
+      add('Futures positioning', fr > 0.0001 ? 'up' : fr < -0.00005 ? 'down' : 'flat', 'weak',
+        fr > 0.0001 ? 'Futures traders are paying to stay long, so the crowd leans bullish.' : fr < -0.00005 ? 'Futures traders are paying to stay short, so the crowd leans bearish.' : 'Futures funding is near zero, so there is no strong lean either way.');
+    }
+    if (finite(v.mid)) {
+      const d = Math.abs(v.mid - 0.5);
+      add('Kalshi traders', v.mid > 0.55 ? 'up' : v.mid < 0.45 ? 'down' : 'flat', d > 0.25 ? 'strong' : d > 0.1 ? 'moderate' : 'weak',
+        `Kalshi's price puts the chance of Up at ${pct(v.mid, 0)}.`);
+    }
+    const rounds = (T && T.rounds) || [];
+    if (rounds.length >= 4) {
+      const last = rounds.slice(0, 8), ups = last.filter((r) => r.result === 'yes').length;
+      add('Past rounds', 'flat', 'weak', `Up won ${ups} of the last ${last.length} rounds. Each round starts fresh, so this is background, not a signal.`, true);
+    }
+    return items;
+  }
+
+  function renderEvidence(v) {
+    const list = $('evidence'), sum = $('whySummary');
+    list.textContent = ''; sum.textContent = '';
+    if (!v || !v.f || !finite(v.target)) {
+      const p = document.createElement('p');
+      p.className = state.everOk && state.trend ? 'value-empty' : 'skeleton';
+      p.textContent = state.everOk && state.trend ? 'Evidence appears once the window has a target.' : 'Loading live data…';
+      sum.appendChild(p);
+      return;
+    }
+    const items = evidenceList(v);
+    let up = 0, down = 0, nUp = 0, nDown = 0, nFlat = 0;
+    for (const it of items) {
+      if (it.dir === 'up') { up += WEIGHT[it.strength]; nUp++; }
+      else if (it.dir === 'down') { down += WEIGHT[it.strength]; nDown++; }
+      else nFlat++;
+    }
+    const lean = up - down > 0.75 ? 'up' : down - up > 0.75 ? 'down' : 'mixed';
+    const head = document.createElement('div'); head.className = 'why-head';
+    const verdict = document.createElement('span');
+    verdict.className = 'why-verdict ' + (lean === 'mixed' ? '' : lean);
+    verdict.textContent = lean === 'up' ? 'Evidence leans Up' : lean === 'down' ? 'Evidence leans Down' : 'Evidence is mixed';
+    const count = document.createElement('span'); count.className = 'why-count';
+    count.textContent = `${nUp} up · ${nDown} down · ${nFlat} neutral`;
+    head.append(verdict, count);
+    const bar = document.createElement('div'); bar.className = 'why-bar'; bar.setAttribute('aria-hidden', 'true');
+    const total = nUp + nDown + nFlat || 1;
+    [['u', nUp], ['n', nFlat], ['d', nDown]].forEach(([cls, n]) => {
+      if (!n) return;
+      const i = document.createElement('i'); i.className = cls; i.style.width = ((100 * n) / total).toFixed(1) + '%'; bar.appendChild(i);
+    });
+    sum.append(head, bar);
+    for (const it of items) {
+      const li = document.createElement('li'); li.className = 'ev'; li.dataset.dir = it.dir;
+      const icon = document.createElement('span'); icon.className = 'ev-icon'; icon.setAttribute('aria-hidden', 'true');
+      icon.textContent = it.dir === 'up' ? '▲' : it.dir === 'down' ? '▼' : '–';
+      const title = document.createElement('span'); title.className = 'ev-title'; title.textContent = it.title;
+      const tag = document.createElement('span'); tag.className = 'ev-tag';
+      tag.textContent = it.context ? 'Context' : it.dir === 'flat' ? 'Neutral' : `${it.dir === 'up' ? 'Up' : 'Down'} · ${it.strength}`;
+      const text = document.createElement('span'); text.className = 'ev-text'; text.textContent = it.text;
+      li.append(icon, title, tag, text);
+      list.appendChild(li);
+    }
+    const note = document.createElement('li'); note.className = 'why-note';
+    note.textContent = 'Signals show what is pushing the price right now and can flip within minutes. They explain the move; they don’t guarantee it.';
+    list.appendChild(note);
+  }
+
+  // ---------- trend + past rounds ----------
+  let range = ['1h', '4h', '24h'].includes(store.get('ip.range', '1h')) ? store.get('ip.range', '1h') : '1h';
+  const RANGE = { '1h': { n: 60, avg: 15, label: '15-minute average', span: 'hour' }, '4h': { n: 240, avg: 60, label: '1-hour average', span: '4 hours' }, '24h': { n: 288, avg: 48, label: '4-hour average', span: '24 hours' } };
+  function trendData(v) {
+    const T = state.trend;
+    if (!T) return null;
+    const cfg = RANGE[range];
+    const basis = (T.calib && finite(T.calib.basis)) ? T.calib.basis : 0;
+    const src = range === '24h' ? T.bars5 : T.bars;
+    const step = range === '24h' ? 300 : 60;
+    if (!src || src.length < 3) return null;
+    const startIdx = Math.max(0, src.length - cfg.n);
+    const pts3 = [], avg = [];
+    for (let i = startIdx; i < src.length; i++) {
+      const t = (src[i][0] + step) * 1000;
+      pts3.push([t, src[i][4] + basis]);
+      if (i - cfg.avg + 1 >= 0) avg.push([t, mean(src.slice(i - cfg.avg + 1, i + 1).map((b) => b[4])) + basis]);
+    }
+    if (v && finite(v.price)) pts3.push([Math.max(serverNow(), pts3[pts3.length - 1][0]), v.price]);
+    return { pts: pts3, avg, cfg };
+  }
+
+  function renderTrendChart(v) {
+    const box = $('trendChart');
+    const d = trendData(v);
+    if (!d) { empty(box, 'Trend appears once price history loads.'); return; }
+    const { svg, w, h } = frame(box, 220);
+    const P = { l: 56, r: 12, t: 10, b: 24 };
+    const x0 = d.pts[0][0], x1 = d.pts[d.pts.length - 1][0];
+    const vals = d.pts.map((p) => p[1]).concat(d.avg.map((p) => p[1]));
+    let lo = Math.min(...vals), hi = Math.max(...vals);
+    const pad = Math.max((hi - lo) * 0.08, 5); lo -= pad; hi += pad;
+    const x = (t) => P.l + ((t - x0) / (x1 - x0 || 1)) * (w - P.l - P.r);
+    const y = (p) => P.t + ((hi - p) / (hi - lo)) * (h - P.t - P.b);
+    // past rounds as background bands
+    const rounds = (state.trend && state.trend.rounds) || [];
+    for (const r of rounds) {
+      const a = Math.max(Date.parse(r.open), x0), b = Math.min(Date.parse(r.close), x1);
+      if (b <= a) continue;
+      el('rect', { x: x(a), y: P.t, width: Math.max(1, x(b) - x(a) - (range === '24h' ? 0 : 1)), height: h - P.t - P.b,
+        fill: r.result === 'yes' ? css('--up') : css('--down'), 'fill-opacity': 0.13 }, svg);
+    }
+    const m = state.live && state.live.market;
+    if (m) {
+      const a = Math.max(Date.parse(m.open), x0);
+      if (a < x1) el('rect', { x: x(a), y: P.t, width: Math.max(1, x(x1) - x(a)), height: h - P.t - P.b, fill: css('--gold'), 'fill-opacity': 0.12 }, svg);
+    }
+    const step = [5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000].find((s2) => (hi - lo) / s2 <= 5) || 2000;
+    for (let g = Math.ceil(lo / step) * step; g <= hi; g += step) {
+      el('line', { x1: P.l, x2: w - P.r, y1: y(g), y2: y(g), stroke: css('--line'), 'stroke-dasharray': '2 4' }, svg);
+      const t = el('text', { x: P.l - 8, y: y(g) + 4, 'text-anchor': 'end' }, svg); t.textContent = g.toLocaleString('en-US');
+    }
+    const t0 = el('text', { x: x(x0), y: h - 6, 'text-anchor': 'start' }, svg); t0.textContent = et(x0);
+    const t1 = el('text', { x: x(x1), y: h - 6, 'text-anchor': 'end' }, svg); t1.textContent = 'now';
+    if (d.avg.length > 1) el('path', { d: 'M' + d.avg.map(([t, p]) => `${x(t).toFixed(1)},${y(p).toFixed(1)}`).join(' L'), fill: 'none', stroke: css('--muted'), 'stroke-width': 1.5, 'stroke-dasharray': '4 3' }, svg);
+    el('path', { d: 'M' + d.pts.map(([t, p]) => `${x(t).toFixed(1)},${y(p).toFixed(1)}`).join(' L'), fill: 'none', stroke: css('--ink'), 'stroke-width': 1.75, 'stroke-linejoin': 'round' }, svg);
+    const last = d.pts[d.pts.length - 1];
+    el('circle', { cx: x(last[0]), cy: y(last[1]), r: 4, fill: css('--gold'), stroke: css('--surface'), 'stroke-width': 2 }, svg);
+
+    const change = last[1] - d.pts[0][1];
+    const avgNow = d.avg.length ? d.avg[d.avg.length - 1][1] : null;
+    const pos = finite(avgNow) ? (last[1] >= avgNow ? 'above' : 'below') : null;
+    const word = Math.abs(change) < (v && v.speed ? v.speed.v * 2 : 20) ? 'flat' : change > 0 ? 'up' : 'down';
+    setText('trendLine', `Over the last ${d.cfg.span} BTC is ${word === 'flat' ? 'roughly flat' : (word === 'up' ? 'up ' : 'down ') + usd(Math.abs(change), 0)}` +
+      (pos ? `, and ${pos} its ${d.cfg.label}.` : '.') +
+      (word !== 'flat' && pos === (word === 'up' ? 'above' : 'below') ? ` That's a short-term ${word}trend.` : ''));
+    box.setAttribute('aria-label', `BTC over the last ${d.cfg.span}: ${word === 'flat' ? 'roughly flat' : word + ' ' + usd(Math.abs(change), 0)}. Shaded bands show past rounds, green for Up and red for Down.`);
+
+    const cross = el('line', { y1: P.t, y2: h - P.b, stroke: css('--gold'), 'stroke-width': 1, visibility: 'hidden' }, svg);
+    hover(svg, (e) => {
+      const r = svg.getBoundingClientRect();
+      const px = clamp(e.clientX - r.left, P.l, w - P.r);
+      const t = x0 + ((px - P.l) / (w - P.l - P.r)) * (x1 - x0);
+      const a = nearest(d.pts, t);
+      if (!a) return;
+      const av = nearest(d.avg, t);
+      const rd = rounds.find((q) => Date.parse(q.open) <= a[0] && a[0] < Date.parse(q.close) + 1000);
+      cross.setAttribute('x1', x(a[0])); cross.setAttribute('x2', x(a[0])); cross.setAttribute('visibility', 'visible');
+      const lines = [[et(a[0])], [{ b: usd(a[1]) }]];
+      if (av) lines.push(['Average ' + usd(av[1], 0)]);
+      if (rd) lines.push([`Round ${et(Date.parse(rd.open))}: `, { b: rd.result === 'yes' ? 'Up' : 'Down' }]);
+      showTip(e, lines);
+    }, () => cross.setAttribute('visibility', 'hidden'));
+  }
+
+  function renderRounds() {
+    const rounds = (state.trend && state.trend.rounds) || [];
+    const list = $('rounds');
+    list.textContent = '';
+    if (!rounds.length) { ['rUp', 'rMove', 'rStreak', 'rLast'].forEach((id) => setText(id, '–')); return; }
+    const inRange = rounds.slice(0, range === '1h' ? 4 : range === '4h' ? 16 : 96);
+    const ups = inRange.filter((r) => r.result === 'yes').length;
+    setText('rUp', `${ups} of ${inRange.length} · ${pct(ups / inRange.length, 0)}`);
+    const moves = inRange.filter((r) => finite(r.settle) && finite(r.target)).map((r) => Math.abs(r.settle - r.target));
+    setText('rMove', moves.length ? usd(mean(moves), 0) : '–');
+    let best = { n: 0, res: null }, cur = { n: 0, res: null };
+    for (const r of inRange.slice().reverse()) {
+      cur = r.result === cur.res ? { n: cur.n + 1, res: r.result } : { n: 1, res: r.result };
+      if (cur.n > best.n) best = cur;
+    }
+    setText('rStreak', `${best.n} ${best.res === 'yes' ? 'Up' : 'Down'} in a row`);
+    const lr = rounds[0];
+    const mv = finite(lr.settle) && finite(lr.target) ? ' ' + sUsd(lr.settle - lr.target, 0) : '';
+    setText('rLast', `${lr.result === 'yes' ? 'Up' : 'Down'}${mv}`);
+    for (const r of rounds.slice(0, 9)) {
+      const li = document.createElement('li');
+      const up = r.result === 'yes';
+      li.className = up ? 'up' : 'down';
+      const res = document.createElement('span'); res.className = 'r-res'; res.textContent = (up ? '▲ ' : '▼ ') + (up ? 'Up' : 'Down');
+      const time = document.createElement('span'); time.className = 'r-time'; time.textContent = et(Date.parse(r.close));
+      const mvs = document.createElement('span');
+      mvs.textContent = finite(r.settle) && finite(r.target) ? sUsd(r.settle - r.target, 0) : '';
+      li.append(res, time, mvs);
+      list.appendChild(li);
+    }
+  }
+
+  document.querySelectorAll('.range-switch button').forEach((btn) => {
+    btn.setAttribute('aria-pressed', String(btn.dataset.range === range));
+    btn.addEventListener('click', () => {
+      range = btn.dataset.range;
+      store.set('ip.range', range);
+      document.querySelectorAll('.range-switch button').forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+      renderRounds();
+      renderTrendChart(state.view);
+    });
+  });
+
+  const CHARTS = { priceChart: renderPriceChart, trendChart: renderTrendChart, landChart: renderLanding, oddsChart: renderOddsChart };
+
+  // ---------- alerts: chime + vibration when a Buy call appears ----------
+  const alerts = { on: store.get('ip.alerts', false) === true, ctx: null };
+  function unlockAudio() {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      alerts.ctx = alerts.ctx || new AC();
+      if (alerts.ctx.state === 'suspended') alerts.ctx.resume();
+    } catch { /* sound unavailable */ }
+  }
+  function chime() {
+    const ctx = alerts.ctx;
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    [[880, 0], [1320, 0.16]].forEach(([hz, at]) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'sine'; o.frequency.value = hz;
+      g.gain.setValueAtTime(0.0001, t + at);
+      g.gain.exponentialRampToValueAtTime(0.25, t + at + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + at + 0.28);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(t + at); o.stop(t + at + 0.3);
+    });
+  }
+  function notifyBuy() {
+    if (!alerts.on) return;
+    chime();
+    if (navigator.vibrate) navigator.vibrate([140, 70, 140]);
+  }
+  function syncAlertButton() {
+    $('alertBtn').setAttribute('aria-pressed', String(alerts.on));
+    setText('alertLabel', alerts.on ? 'Alerts on' : 'Alert me');
+  }
+  $('alertBtn').addEventListener('click', () => {
+    alerts.on = !alerts.on;
+    store.set('ip.alerts', alerts.on);
+    if (alerts.on) { unlockAudio(); chime(); }
+    syncAlertButton();
+    setText('announce', alerts.on ? 'Alerts on. You will hear a chime when a Buy call appears.' : 'Alerts off.');
+  });
+  // Browsers only allow sound after a tap, so unlock audio on the first touch of the page.
+  document.addEventListener('pointerdown', () => { if (alerts.on) unlockAudio(); }, { once: true });
 
   // ---------- bet log ----------
   let log = store.get('ed.log', []);
@@ -923,19 +1316,25 @@
   }
 
   // ---------- loops ----------
-  function loop(fn, ms) {
+  // In the background the desk sleeps (saves battery and data), unless alerts are on,
+  // in which case it keeps checking the call every 5 seconds.
+  function loop(fn, ms, always) {
     const run = async () => {
-      if (!document.hidden) await fn();
-      setTimeout(run, document.hidden ? ms * 3 : ms);
+      const hidden = document.hidden;
+      if (!hidden || always || alerts.on) await fn();
+      setTimeout(run, hidden ? (alerts.on ? Math.max(ms, 5000) : Math.max(ms, 2000)) : ms);
     };
     run();
   }
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) { pollLive(); pollContext(); } });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { if (!alerts.on) pauseStream(); }
+    else { resumeStream(); pollLive(); pollContext(); }
+  });
   let resizeTimer;
   window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => renderCharts(state.view), 150); });
 
   // Keyboard: focus a chart, then arrow keys move the read-out (Shift for bigger steps).
-  ['landChart', 'oddsChart', 'priceChart'].forEach((id) => {
+  ['landChart', 'oddsChart', 'priceChart', 'trendChart'].forEach((id) => {
     const box = $(id);
     box.__frac = 1;
     const show = () => {
@@ -963,12 +1362,46 @@
   });
   window.addEventListener('themechange', () => renderCharts(state.view));
 
+  // ---------- Simple / Pro ----------
+  function setView(mode) {
+    document.documentElement.dataset.view = mode;
+    try { localStorage.setItem('ip.view', mode); } catch { /* per-device only */ }
+    $('viewSimple').setAttribute('aria-pressed', String(mode !== 'pro'));
+    $('viewPro').setAttribute('aria-pressed', String(mode === 'pro'));
+    render();
+  }
+  $('viewSimple').addEventListener('click', () => setView('simple'));
+  $('viewPro').addEventListener('click', () => setView('pro'));
+  if (isPro()) { $('viewSimple').setAttribute('aria-pressed', 'false'); $('viewPro').setAttribute('aria-pressed', 'true'); }
+
+  // ---------- explainers ----------
+  document.querySelectorAll('.info-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const open = btn.getAttribute('aria-expanded') !== 'true';
+      btn.setAttribute('aria-expanded', String(open));
+      $(btn.getAttribute('aria-controls')).hidden = !open;
+    });
+  });
+
+  // ---------- first-visit guide ----------
+  if (store.get('ip.guide', null) !== 'done') $('guide').hidden = false;
+  $('guideClose').addEventListener('click', () => { $('guide').hidden = true; store.set('ip.guide', 'done'); $('main').focus(); });
+  $('guideOpen').addEventListener('click', () => {
+    $('guide').hidden = false;
+    $('guide').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    $('guideTitle').setAttribute('tabindex', '-1');
+    $('guideTitle').focus({ preventScroll: true });
+  });
+
+  Object.keys(CHARTS).forEach((id) => chartObserver && chartObserver.observe($(id)));
   bindSettings();
   renderLog();
+  syncAlertButton();
   render();
   connectStream();
+  loop(pollTrend, TREND_MS);
   loop(pollContext, CONTEXT_MS);
   loop(pollLive, LIVE_MS);
-  loop(resolveBets, RESULT_MS);
+  loop(resolveBets, RESULT_MS, true);
   setInterval(tick, 250);
 })();

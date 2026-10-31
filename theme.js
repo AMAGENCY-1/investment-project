@@ -9,6 +9,8 @@
     else root.removeAttribute('data-theme');
   }
   apply(get());
+  // Detail level (Simple / Pro), applied early so Pro panels never flash.
+  try { if (localStorage.getItem('ip.view') === 'pro') document.documentElement.setAttribute('data-view', 'pro'); } catch (e) { /* default Simple */ }
   document.addEventListener('DOMContentLoaded', function () {
     var btn = document.getElementById('themeBtn');
     function sync(mode) {
