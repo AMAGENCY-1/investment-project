@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Investment Project</title>
+<meta name="description" content="Live odds, liquidity and edge for Kalshi BTC 15-minute markets.">
+<meta name="theme-color" content="#0D0E12">
+<meta name="robots" content="noindex, nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Investment">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+<script src="/theme.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="bar">
+  <div class="bar-inner">
+    <a class="brand" href="/" aria-label="Investment Project, AMAGENCY. Go to the desk">
+      <span class="brand-eyebrow" aria-hidden="true">AMAGENCY</span>
+      <span class="brand-name" aria-hidden="true">Investment <em>Project</em></span>
+    </a>
+    <div class="bar-tools">
+      <nav class="nav" aria-label="Main">
+        <a href="/" aria-current="page">Desk</a>
+        <a href="/status">Status</a>
+      </nav>
+      <div class="status" id="status" data-state="connecting" title="Connection to live data"><i aria-hidden="true"></i><span id="statusText">Connecting</span></div>
+      <button type="button" class="theme-btn" id="themeBtn" aria-label="Theme: Auto. Switch theme"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.75a6.25 6.25 0 0 1 0 12.5z" fill="currentColor"/></svg><span class="theme-label">Auto</span></button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap" id="main" tabindex="-1">
+  <section class="hero" aria-labelledby="pageTitle">
+    <div class="hero-meta">
+      <h1 class="eyebrow" id="pageTitle">BTC 15-minute · Kalshi</h1>
+      <span class="window" id="windowLabel">Finding the live window…</span>
+    </div>
+    <div class="clock-row">
+      <div class="clock" id="clock" role="timer" aria-label="Time until this window closes" aria-live="off">--:--</div>
+      <div class="clock-note" id="clockNote" aria-hidden="true">until close</div>
+    </div>
+    <div class="progress" aria-hidden="true"><i id="progress"></i></div>
+
+    <div class="verdict" id="verdict" data-state="wait">
+      <div class="verdict-label" aria-hidden="true">Call</div>
+      <p class="verdict-word" id="verdictWord">Wait</p>
+      <p class="verdict-sub" id="verdictSub">Loading live prices</p>
+    </div>
+    <div class="sr-only" id="announce" aria-live="polite" aria-atomic="true"></div>
+
+    <dl class="ticket" id="ticket">
+      <div><dt>Stake</dt><dd id="tStake">–</dd></div>
+      <div><dt>Contracts</dt><dd id="tQty">–</dd></div>
+      <div><dt>Pays</dt><dd id="tPays">–</dd></div>
+      <div><dt>Edge</dt><dd id="tEdge">–</dd></div>
+    </dl>
+  </section>
+
+  <section class="metrics" aria-label="Key numbers">
+    <div class="metric"><span class="m-label" id="lTarget">Target</span><span class="m-value" id="mTarget" aria-describedby="lTarget">–</span><span class="m-note" id="mTargetNote">60s avg at open</span></div>
+    <div class="metric"><span class="m-label" id="lNow">Now</span><span class="m-value" id="mNow" aria-describedby="lNow">–</span><span class="m-note" id="mNowNote">4-exchange median</span></div>
+    <div class="metric"><span class="m-label" id="lGap">Gap</span><span class="m-value" id="mGap" aria-describedby="lGap">–</span><span class="m-note" id="mGapNote">now vs target</span></div>
+    <div class="metric"><span class="m-label" id="lSpeed">Speed</span><span class="m-value" id="mSpeed" aria-describedby="lSpeed">–</span><span class="m-note" id="mSpeedNote">typical move / min</span></div>
+  </section>
+
+  <div class="grid">
+    <div class="col">
+      <section class="card" aria-labelledby="oddsTitle">
+        <div class="card-head">
+          <h2 id="oddsTitle">Our odds vs Kalshi</h2>
+          <span class="hint">Buy only when our odds beat the price</span>
+        </div>
+        <div class="table-scroll">
+          <table class="odds" id="oddsTable">
+            <caption class="sr-only">Our chance for Up and Down compared with Kalshi's price, fee, edge, payout and depth</caption>
+            <thead><tr><td></td><th scope="col" class="up-h">Up</th><th scope="col" class="down-h">Down</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">Our odds</th><td id="oUpP">–</td><td id="oDnP">–</td></tr>
+              <tr><th scope="row">Kalshi ask</th><td id="oUpAsk">–</td><td id="oDnAsk">–</td></tr>
+              <tr><th scope="row">Fee</th><td id="oUpFee">–</td><td id="oDnFee">–</td></tr>
+              <tr class="edge-row"><th scope="row">Edge</th><td id="oUpEdge">–</td><td id="oDnEdge">–</td></tr>
+              <tr><th scope="row">Kalshi pays</th><td id="oUpPay">–</td><td id="oDnPay">–</td></tr>
+              <tr><th scope="row">Fair pays</th><td id="oUpFair">–</td><td id="oDnFair">–</td></tr>
+              <tr><th scope="row">Depth ≤ +5¢</th><td id="oUpDepth">–</td><td id="oDnDepth">–</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="landTitle">
+        <div class="card-head">
+          <h2 id="landTitle">Where BTC settles</h2>
+          <span class="hint" id="landHint">Forecast of the closing 60-second average</span>
+        </div>
+        <div class="chart" id="landChart" role="img" tabindex="0" aria-label="Forecast distribution of the settlement price" aria-describedby="chartHelp"></div>
+      </section>
+
+      <section class="card" aria-labelledby="pathTitle">
+        <div class="card-head">
+          <h2 id="pathTitle">Odds through this window</h2>
+          <div class="legend" aria-hidden="true">
+            <span><i class="sw sw-model"></i>Our odds</span>
+            <span><i class="sw sw-kalshi"></i>Kalshi</span>
+          </div>
+        </div>
+        <div class="chart" id="oddsChart" role="img" tabindex="0" aria-label="Chance of Up over this window, ours versus Kalshi" aria-describedby="chartHelp"></div>
+      </section>
+
+      <section class="card" aria-labelledby="priceTitle">
+        <div class="card-head">
+          <h2 id="priceTitle">Price vs target</h2>
+          <span class="hint" id="priceHint">This window</span>
+        </div>
+        <div class="chart" id="priceChart" role="img" tabindex="0" aria-label="BTC price in this window against the target" aria-describedby="chartHelp"></div>
+        <p class="chart-help" id="chartHelp">Touch or hover a chart for values. With a keyboard, focus a chart and use the arrow keys.</p>
+      </section>
+    </div>
+
+    <div class="col">
+      <section class="card" aria-labelledby="kbookTitle">
+        <div class="card-head">
+          <h2 id="kbookTitle">Kalshi liquidity</h2>
+          <span class="hint" id="kbookHint">Contracts you can buy now</span>
+        </div>
+        <div class="ladders">
+          <div class="ladder buy-up">
+            <h3 class="ladder-head up-h" id="ladUpH">Buy Up</h3>
+            <ol id="ladUp" aria-labelledby="ladUpH"></ol>
+          </div>
+          <div class="ladder buy-down">
+            <h3 class="ladder-head down-h" id="ladDnH">Buy Down</h3>
+            <ol id="ladDn" aria-labelledby="ladDnH"></ol>
+          </div>
+        </div>
+        <dl class="facts" id="kFacts">
+          <div><dt>Spread · Up</dt><dd id="kSpread">–</dd></div>
+          <div><dt>Volume</dt><dd id="kVol">–</dd></div>
+          <div><dt>Open interest</dt><dd id="kOI">–</dd></div>
+          <div><dt>Kalshi's speed</dt><dd id="kImplied">–</dd></div>
+        </dl>
+      </section>
+
+      <section class="card" aria-labelledby="spotTitle">
+        <div class="card-head">
+          <h2 id="spotTitle">Spot order book</h2>
+          <span class="hint">Coinbase + Kraken, BTC resting near price</span>
+        </div>
+        <div class="depth" id="depthRows"></div>
+        <h3 class="sub-h">Taker flow · Coinbase</h3>
+        <div class="depth" id="flowRows"></div>
+      </section>
+
+      <section class="card" aria-labelledby="pulseTitle">
+        <div class="card-head">
+          <h2 id="pulseTitle">Market pulse</h2>
+          <span class="hint">Derivatives and volatility</span>
+        </div>
+        <dl class="facts" id="pulse">
+          <div><dt>Speed $/min · 15/30/60m</dt><dd id="pSpeed">–</dd></div>
+          <div><dt>Implied speed (DVOL)</dt><dd id="pDvol">–</dd></div>
+          <div><dt>Funding 8h · Deribit</dt><dd id="pFundD">–</dd></div>
+          <div><dt>Funding 8h · Hyperliquid</dt><dd id="pFundH">–</dd></div>
+          <div><dt>Open interest</dt><dd id="pOI">–</dd></div>
+          <div><dt>Perp premium</dt><dd id="pPrem">–</dd></div>
+          <div><dt>Liquidations · 15m</dt><dd id="pLiq">–</dd></div>
+          <div><dt>Exchange spread</dt><dd id="pSpread">–</dd></div>
+          <div><dt>Index calibration</dt><dd id="pCal">–</dd></div>
+          <div><dt>Model check</dt><dd id="pCheck">–</dd></div>
+        </dl>
+        <div class="venues" id="venues" aria-label="Exchange prices"></div>
+      </section>
+
+      <section class="card" aria-labelledby="logTitle">
+        <div class="card-head">
+          <h2 id="logTitle">Bet log</h2>
+          <span class="hint">Proves whether the edge is real</span>
+        </div>
+        <p class="note">Place the trade in Kalshi first, then log it here. Results fill in automatically after each window settles.</p>
+        <form class="log-form" id="logForm" novalidate>
+          <div class="stake-field"><label for="logStake">Stake ($)</label>
+          <input id="logStake" type="number" inputmode="decimal" min="0.01" step="0.01" value="2" aria-describedby="stakeMsg"></div>
+          <button type="button" class="btn btn-up" id="logUp" disabled>Log Up</button>
+          <button type="button" class="btn btn-down" id="logDn" disabled>Log Down</button>
+          <p class="field-msg" id="stakeMsg" aria-live="polite"></p>
+        </form>
+        <dl class="facts" id="logSummary">
+          <div><dt>Bets</dt><dd id="sBets">0</dd></div>
+          <div><dt>Won</dt><dd id="sWin">–</dd></div>
+          <div><dt>Profit</dt><dd id="sPnl">$0.00</dd></div>
+          <div><dt>Expected</dt><dd id="sExp">$0.00</dd></div>
+        </dl>
+        <div class="table-scroll">
+          <table class="log" id="logTable">
+            <caption class="sr-only">Logged bets, newest first</caption>
+            <thead><tr><th scope="col">Window</th><th scope="col">Side</th><th scope="col">Price</th><th scope="col">Stake</th><th scope="col">Result</th></tr></thead>
+            <tbody id="logBody"></tbody>
+          </table>
+        </div>
+        <p class="empty" id="logEmpty">No bets logged yet. Your first one appears here.</p>
+        <div class="clear-row">
+          <button type="button" class="link" id="clearLog">Clear log</button>
+          <span id="clearConfirm" hidden>Delete every logged bet? <button type="button" class="link danger" id="clearYes">Delete</button> <button type="button" class="link" id="clearNo">Keep</button></span>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="setTitle">
+        <details id="settings">
+          <summary><span class="summary-text"><h2 id="setTitle">Settings</h2><span class="hint">Bankroll, sizing, speed</span></span><span class="summary-icon" aria-hidden="true"></span></summary>
+          <form class="settings" id="settingsForm" novalidate>
+            <label for="sBank">Bankroll ($)<input id="sBank" type="number" inputmode="decimal" min="1" step="1" value="10" aria-describedby="hBank"><span class="help" id="hBank">Money you're willing to put at risk.</span></label>
+            <label for="sKelly">Bet sizing
+              <select id="sKelly" aria-describedby="hKelly"><option value="0.25">Quarter Kelly (safest)</option><option value="0.5">Half Kelly</option><option value="1">Full Kelly (aggressive)</option></select>
+              <span class="help" id="hKelly">Share of the mathematically optimal bet to use.</span>
+            </label>
+            <label for="sCap">Max stake (% of bankroll)<input id="sCap" type="number" inputmode="decimal" min="1" max="100" step="1" value="20"></label>
+            <label for="sMinEdge">Minimum edge (points)<input id="sMinEdge" type="number" inputmode="decimal" min="0" max="50" step="0.5" value="5" aria-describedby="hEdge"><span class="help" id="hEdge">A side must beat Kalshi's price by this much.</span></label>
+            <label for="sFee">Kalshi fee rate<input id="sFee" type="number" inputmode="decimal" min="0" max="0.2" step="0.005" value="0.07"></label>
+            <label for="sSpeedSrc">Speed source
+              <select id="sSpeedSrc">
+                <option value="blend">Measured · blend of 15/30/60 min</option>
+                <option value="m15">Measured · last 15 min</option>
+                <option value="m30">Measured · last 30 min</option>
+                <option value="m60">Measured · last 60 min</option>
+                <option value="dvol">Implied · Deribit DVOL</option>
+                <option value="manual">Manual</option>
+              </select>
+            </label>
+            <label for="sManual">Manual speed ($ / min)<input id="sManual" type="number" inputmode="decimal" min="1" step="1" value="15"></label>
+          </form>
+          <p class="note">Fee is estimated as rate × price × (1 − price) per contract, the formula Kalshi publishes for most markets. Check your fill for the exact amount.</p>
+        </details>
+      </section>
+    </div>
+  </div>
+
+  <section class="card rules" aria-labelledby="rulesTitle">
+    <h2 id="rulesTitle">How this market settles</h2>
+    <p id="rulesText">Loading Kalshi's rules…</p>
+    <p class="note">Kalshi settles on CF Benchmarks' BRTI, which isn't public in real time. This desk estimates it as Coinbase plus the gap measured from Kalshi's recent targets, and adds that uncertainty to the odds. Odds are model estimates from recent price movement, not guarantees. Size every bet so a loss doesn't matter.</p>
+    <h3 class="sub-h" id="srcTitle">Data sources</h3>
+    <ul class="sources" id="sources" aria-labelledby="srcTitle"></ul>
+  </section>
+  <footer class="site-foot">
+    <span>AMAGENCY · Investment Project · Private</span>
+    <span>Market data: Kalshi, Coinbase, Kraken, Bitstamp, Gemini, Deribit, Hyperliquid</span>
+  </footer>
+</main>
+
+<div class="tip" id="tip" hidden></div>
+<script src="/app.js" defer></script>
+</body>
+</html>

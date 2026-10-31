@@ -1,0 +1,6 @@
+{
+  "name": "investment-project",
+  "private": true,
+  "description": "AMAGENCY Investment Project: live odds and liquidity for Kalshi BTC 15-minute markets",
+  "engines": { "node": "22.x" }
+}

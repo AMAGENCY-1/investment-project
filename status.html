@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Status · Investment Project</title>
+<meta name="description" content="Live health of every data source behind the Investment Project.">
+<meta name="theme-color" content="#0D0E12">
+<meta name="robots" content="noindex, nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Investment">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+<script src="/theme.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="bar">
+  <div class="bar-inner">
+    <a class="brand" href="/" aria-label="Investment Project, AMAGENCY. Go to the desk">
+      <span class="brand-eyebrow" aria-hidden="true">AMAGENCY</span>
+      <span class="brand-name" aria-hidden="true">Investment <em>Project</em></span>
+    </a>
+    <div class="bar-tools">
+      <nav class="nav" aria-label="Main">
+        <a href="/">Desk</a>
+        <a href="/status" aria-current="page">Status</a>
+      </nav>
+      
+      <button type="button" class="theme-btn" id="themeBtn" aria-label="Theme: Auto. Switch theme"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.75a6.25 6.25 0 0 1 0 12.5z" fill="currentColor"/></svg><span class="theme-label">Auto</span></button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap" id="main" tabindex="-1">
+  <section class="banner" id="banner" data-state="wait" aria-live="polite">
+    <span class="banner-icon" id="bannerIcon" aria-hidden="true">…</span>
+    <div>
+      <h1 id="bannerTitle">Checking systems</h1>
+      <p id="bannerSub">Testing every data source from the server.</p>
+    </div>
+  </section>
+
+  <div class="grid">
+    <div class="col">
+      <section class="card" aria-labelledby="srvTitle">
+        <div class="card-head">
+          <h2 id="srvTitle">Data sources</h2>
+          <span class="hint" id="srvHint">Checked from Vercel US-East</span>
+        </div>
+        <ul class="checks" id="checks" aria-labelledby="srvTitle"></ul>
+        <div class="row-actions">
+          <button type="button" class="btn btn-ghost" id="recheck">Check again</button>
+          <span class="hint" id="checkedAt" aria-live="polite"></span>
+        </div>
+      </section>
+    </div>
+    <div class="col">
+      <section class="card" aria-labelledby="devTitle">
+        <div class="card-head">
+          <h2 id="devTitle">This device</h2>
+          <span class="hint">Your phone or computer's own connection</span>
+        </div>
+        <ul class="checks" id="deviceChecks" aria-labelledby="devTitle"></ul>
+      </section>
+
+      <section class="card" aria-labelledby="mktTitle">
+        <div class="card-head">
+          <h2 id="mktTitle">Current market</h2>
+          <span class="hint">Kalshi BTC 15-minute</span>
+        </div>
+        <dl class="facts" id="mkt">
+          <div><dt>Window</dt><dd id="mWindow">–</dd></div>
+          <div><dt>Target</dt><dd id="mTarget">–</dd></div>
+          <div><dt>Ticker</dt><dd id="mTicker">–</dd></div>
+          <div><dt>Server time</dt><dd id="mServer">–</dd></div>
+        </dl>
+      </section>
+
+      <section class="card" aria-labelledby="secTitle">
+        <div class="card-head"><h2 id="secTitle">Security</h2></div>
+        <ul class="shield">
+          <li><span class="tick" aria-hidden="true">✓</span><span><b>Private access</b><span class="d">Only signed-in members of the AMAGENCY Vercel team can open the app or its data.</span></span></li>
+          <li><span class="tick" aria-hidden="true">✓</span><span><b>Locked-down pages</b><span class="d">Content Security Policy allows code from this site only and connections to this site and the Coinbase stream. No framing, no referrer, no camera, microphone or location.</span></span></li>
+          <li><span class="tick" aria-hidden="true">✓</span><span><b>Encrypted everywhere</b><span class="d">HTTPS with HSTS preload on every request; the price stream is a secure WebSocket.</span></span></li>
+          <li><span class="tick" aria-hidden="true">✓</span><span><b>Read-only by design</b><span class="d">Public market data only. No API keys, no account access, no third-party scripts or packages.</span></span></li>
+          <li><span class="tick" aria-hidden="true">✓</span><span><b>Your log stays with you</b><span class="d">The bet log is stored in this browser on this device and never leaves it.</span></span></li>
+        </ul>
+      </section>
+    </div>
+  </div>
+  <footer class="site-foot">
+    <span>AMAGENCY · Investment Project · Private</span>
+    <span>Market data: Kalshi, Coinbase, Kraken, Bitstamp, Gemini, Deribit, Hyperliquid</span>
+  </footer>
+</main>
+<script src="/status.js" defer></script>
+</body>
+</html>
