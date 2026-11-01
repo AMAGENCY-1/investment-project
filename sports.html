@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Sports · Investment Project</title>
-<meta name="description" content="NBA player props on Kalshi: projections from raw stats, value and evidence.">
+<meta name="description" content="NBA and NFL player props on Kalshi: projections from raw stats, value and evidence.">
 <meta name="theme-color" content="#0D0E12">
 <meta name="robots" content="noindex, nofollow">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -43,7 +43,7 @@
 <main class="wrap" id="main" tabindex="-1">
   <section class="hero sports-hero" aria-labelledby="pageTitle">
     <div class="hero-meta">
-      <h1 class="eyebrow" id="pageTitle">NBA player props · Kalshi</h1>
+      <h1 class="eyebrow" id="pageTitle">Player props · Kalshi</h1>
       <span class="window" id="slateLabel">Loading tonight's slate…</span>
     </div>
     <p class="sports-lede">Our projections from raw ESPN stats, compared with Kalshi's prices. Most props are fairly priced; the few that aren't rise to the top.</p>
@@ -82,15 +82,11 @@
   </section>
 
   <section class="card filters" aria-label="Filter props">
-    <div class="chips" role="group" aria-label="Stat" id="statChips">
-      <button type="button" data-stat="all" aria-pressed="true">All</button>
-      <button type="button" data-stat="pts" aria-pressed="false">Points</button>
-      <button type="button" data-stat="reb" aria-pressed="false">Rebounds</button>
-      <button type="button" data-stat="ast" aria-pressed="false">Assists</button>
-      <button type="button" data-stat="fg3" aria-pressed="false">Threes</button>
-      <button type="button" data-stat="combo" aria-pressed="false">Combos</button>
-      <button type="button" data-stat="def" aria-pressed="false">Steals &amp; blocks</button>
+    <div class="view-switch league-switch" role="group" aria-label="League">
+      <button type="button" data-league="nba" aria-pressed="true">NBA</button>
+      <button type="button" data-league="nfl" aria-pressed="false">NFL</button>
     </div>
+    <div class="chips" role="group" aria-label="Stat" id="statChips"></div>
     <div class="filter-row">
       <label for="gameSel" class="sr-only">Game</label>
       <select id="gameSel"><option value="all">All games</option></select>
@@ -155,9 +151,9 @@
         <details>
           <summary><span class="summary-text"><h2 id="howTitle">How the projections work</h2><span class="hint">Method, rules and limits</span></span><span class="summary-icon" aria-hidden="true"></span></summary>
           <ul class="method">
-            <li>Minutes: a blend of the last 5 games, this season and last season.</li>
-            <li>Production per minute: this season, leaning on last season until about 10 games are played, plus recent form.</li>
-            <li>Opponent: scoring props are nudged by how many points the opponent allows.</li>
+            <li><b>NBA:</b> minutes (last 5 games, this season, last season) × production per minute, leaning on last season until about 10 games are played, plus recent form.</li>
+            <li><b>NFL:</b> per-game production from this season, last season and the last 3 games, with usage shown as pass attempts, carries or targets.</li>
+            <li>Opponent: scoring and yardage props are nudged by how many points the opponent allows.</li>
             <li>Chance of hitting the line: from the player's own game-to-game swings, with extra room for uncertainty.</li>
             <li>Suggestions only show when the advantage clears your minimum, the market isn't too thin (spread of 10¢ or less), the player isn't on the injury report, and the game hasn't started.</li>
           </ul>

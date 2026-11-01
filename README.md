@@ -18,7 +18,7 @@ round green (Up) or red (Down), and lists the last nine results with how far eac
 
 **Alerts**: tap *Alert me* for a chime and vibration whenever a Buy call appears; the tab title also flags it.
 
-## Sports (NBA player props) · `/sports`
+## Sports (NBA and NFL player props) · `/sports` (NBA) and `/sports#nfl` (NFL)
 - **Data:** every open Kalshi NBA player-prop market (points, rebounds, assists, threes, PRA and other combos,
   steals, blocks) from `/api/nba`, matched to ESPN rosters, game logs (this season and last), team defense
   (points allowed) and the injury report. Built in about 1–2 s and cached for 90 s.
@@ -33,7 +33,13 @@ round green (Up) or red (Down), and lists the last nine results with how far eac
   injury status and the model's projection, plus a last-10-games bar chart against the line.
 - **Safety:** max bet (default $2), quarter-Kelly sizing and a daily loss limit (default $10, pending bets count as
   losses). Once reached, Buy suggestions stop until the next day.
+- **NFL** (`/api/nfl`): passing yards, passing TDs, completions, attempts, interceptions, rushing yards, carries,
+  receiving yards, receptions and rush + receiving yards. Per-game projection blends this season (weighted by games
+  played), last season and the last 3 games; usage (attempts, carries, targets) is shown as evidence; opponent points
+  allowed nudges scoring and yardage props. Yards use a normal model, counts a negative-binomial model.
+  Dead lines (asks under 3¢ or over 97¢) and games already under way are left out. Suggestions need 8+ games of history.
 - **Home Screen:** `/sports` has its own icon and manifest (`/api/manifest?app=sports`), installable separately.
+  The NBA / NFL switch remembers your last choice.
 
 ## Home Screen app
 - **iPhone:** open the site in Safari, tap Share, then *Add to Home Screen*. The app shows these steps itself.
@@ -98,5 +104,6 @@ If our odds and Kalshi's differ by more than 25 points the call is **Check data*
 | `/api/history` | once per window | Kalshi minute prices for back-fill |
 | `/api/result` | 30s | settlement of logged bets |
 | `/api/nba` | 2 min | NBA props, projections, evidence (`?summary=1` for a health summary) |
+| `/api/nfl` | 2 min | NFL props, projections, evidence (`?summary=1` for a health summary) |
 | `/api/manifest` | on install | home-screen app manifests (`?app=sports` for Sports) |
 | `/api/health` | on demand | latency and status of every upstream, including the Coinbase stream |

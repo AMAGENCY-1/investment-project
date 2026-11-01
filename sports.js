@@ -1,4 +1,4 @@
-/* Investment Project · Sports: NBA player props on Kalshi. Loads /api/nba (Kalshi
+/* Investment Project · Sports: NBA and NFL player props on Kalshi. Loads /api/nba or /api/nfl (Kalshi
    prices + ESPN-based projections), works out value with your settings, and shows
    the evidence behind every prop. Includes a bet cap and a daily loss limit. */
 (() => {
@@ -6,6 +6,22 @@
   const $ = (id) => document.getElementById(id);
   const REFRESH_MS = 120000;
   const PAGE = 30;
+
+  // League setup: data feed, stat filters and how much history a suggestion needs.
+  const LEAGUES = {
+    nba: {
+      name: 'NBA', feed: '/api/nba', cacheKey: 'ip.nba', minGames: 15,
+      chips: [['all', 'All'], ['pts', 'Points'], ['reb', 'Rebounds'], ['ast', 'Assists'], ['fg3', 'Threes'], ['combo', 'Combos'], ['def', 'Steals & blocks']],
+      match: (chip, pr) => chip === 'combo' ? ['pra', 'pr', 'pa', 'ra'].includes(pr.stat) : chip === 'def' ? ['stl', 'blk', 'stocks'].includes(pr.stat) : pr.stat === chip,
+    },
+    nfl: {
+      name: 'NFL', feed: '/api/nfl', cacheKey: 'ip.nfl', minGames: 8,
+      chips: [['all', 'All'], ['pass', 'Passing'], ['rush', 'Rushing'], ['rec', 'Receiving'], ['td', 'Touchdowns'], ['combo', 'Combos']],
+      match: (chip, pr) => pr.group === chip,
+    },
+  };
+  let league = /nfl/i.test(location.hash) ? 'nfl' : (() => { try { return localStorage.getItem('ip.sports.league') === 'nfl' ? 'nfl' : 'nba'; } catch { return 'nba'; } })();
+  const L = () => LEAGUES[league];
 
   const store = {
     get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
@@ -43,8 +59,13 @@
   }
 
   // ---------- state ----------
-  const state = { data: store.get('ip.nba', null), filter: { stat: 'all', game: 'all', q: '', goodOnly: false }, shown: PAGE, loadedAt: 0, failed: false };
-  if (state.data && Date.now() - state.data.serverTime > 45 * 60 * 1000) state.data = null;
+  const state = { data: null, filter: { stat: 'all', game: 'all', q: '', goodOnly: false }, shown: PAGE, loadedAt: 0, failed: false };
+  function restore() {
+    const d = store.get(L().cacheKey, null);
+    state.data = d && Date.now() - d.serverTime < 45 * 60 * 1000 ? d : null;
+    state.loadedAt = 0; state.failed = false;
+  }
+  restore();
   let log = store.get('ip.sportslog', []);
 
   // ---------- daily limit ----------
@@ -80,7 +101,7 @@
     if (best.edge >= min) {
       if (pl.injury) return { ...v, chip: 'Injury risk', cls: 'warn', state: 'risk', note: `On the injury report (${pl.injury.status}).` };
       if (spread !== null && spread > 0.10) return { ...v, chip: 'Wide spread', cls: 'warn', state: 'thin', note: 'Few traders here, so the asking price is unreliable. Consider a limit order at our fair price.' };
-      if (pl.games < 15) return { ...v, chip: 'Thin history', cls: 'warn', state: 'thin', note: 'Not enough games to trust the projection.' };
+      if (pl.games < L().minGames) return { ...v, chip: 'Thin history', cls: 'warn', state: 'thin', note: 'Not enough games to trust the projection.' };
       if (locked) return { ...v, chip: 'Daily limit reached', cls: 'bad', state: 'locked', note: 'Suggestions resume tomorrow.' };
       const kelly = best.edge / (1 - best.cost);
       const stake = Math.min(settings.bank * 0.25 * kelly, settings.maxBet);
@@ -93,24 +114,40 @@
   }
 
   // ---------- filters ----------
-  const COMBOS = new Set(['pra', 'pr', 'pa', 'ra']);
-  const DEF = new Set(['stl', 'blk', 'stocks']);
   function matches(pr, pl) {
     const f = state.filter;
-    if (f.stat !== 'all') {
-      if (f.stat === 'combo' && !COMBOS.has(pr.stat)) return false;
-      if (f.stat === 'def' && !DEF.has(pr.stat)) return false;
-      if (f.stat !== 'combo' && f.stat !== 'def' && pr.stat !== f.stat) return false;
-    }
+    if (f.stat !== 'all' && !L().match(f.stat, pr)) return false;
     if (f.game !== 'all' && pl.game !== f.game) return false;
     if (f.q && !pl.name.toLowerCase().includes(f.q)) return false;
     return true;
   }
-  document.querySelectorAll('#statChips button').forEach((b) => b.addEventListener('click', () => {
-    state.filter.stat = b.dataset.stat; state.shown = PAGE;
-    document.querySelectorAll('#statChips button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-    render();
-  }));
+  function buildChips() {
+    const box = $('statChips'); box.textContent = '';
+    const props = (state.data && state.data.props) || [];
+    for (const [value, label] of L().chips) {
+      if (value !== 'all' && props.length && !props.some((pr) => L().match(value, pr))) continue;
+      const b = el('button', '', label); b.type = 'button'; b.dataset.stat = value;
+      b.setAttribute('aria-pressed', String(value === state.filter.stat));
+      b.addEventListener('click', () => {
+        state.filter.stat = value; state.shown = PAGE;
+        box.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+        render();
+      });
+      box.appendChild(b);
+    }
+  }
+  function setLeague(next) {
+    league = next;
+    try { localStorage.setItem('ip.sports.league', next); } catch { /* per-device only */ }
+    history.replaceState(null, '', location.pathname + (next === 'nfl' ? '#nfl' : ''));
+    document.querySelectorAll('.league-switch button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.league === next)));
+    state.filter = { stat: 'all', game: 'all', q: '', goodOnly: $('goodOnly').checked };
+    $('search').value = ''; $('gameSel').length = 1; state.shown = PAGE;
+    setText('pageTitle', `${L().name} player props · Kalshi`);
+    document.title = `${L().name} props · Investment Project`;
+    buildChips(); restore(); render(); load();
+  }
+  document.querySelectorAll('.league-switch button').forEach((b) => b.addEventListener('click', () => { if (b.dataset.league !== league) setLeague(b.dataset.league); }));
   $('gameSel').addEventListener('change', (e) => { state.filter.game = e.target.value; state.shown = PAGE; render(); });
   $('search').addEventListener('input', (e) => { state.filter.q = e.target.value.trim().toLowerCase(); state.shown = PAGE; render(); });
   $('goodOnly').addEventListener('change', (e) => { state.filter.goodOnly = e.target.checked; state.shown = PAGE; render(); });
@@ -171,9 +208,9 @@
     li.dataset.state = v.state;
     const top = el('div', 'prop-top');
     const who = el('div', 'prop-who');
-    who.append(el('span', 'prop-name', pl.name), el('span', 'prop-meta', `${pl.team} ${pl.home === false ? '@' : 'vs'} ${pl.opp}${pl.start ? ' · ' + etTime(pl.start) : ''}`));
+    who.append(el('span', 'prop-name', pl.name), el('span', 'prop-meta', `${pl.pos ? pl.pos + ' · ' : ''}${pl.team} ${pl.home === false ? '@' : 'vs'} ${pl.opp}${pl.start ? ' · ' + etTime(pl.start) : ''}`));
     top.append(who, el('span', 'chip ' + v.cls, v.chip));
-    li.append(top, el('div', 'prop-line', `${pr.line}+ ${pr.statLabel}`));
+    li.append(top, el('div', 'prop-line', lineText(pr)));
     if (pr.chance !== null) {
       const bar = (label, frac, cls, text) => {
         const r = el('div', 'vbar');
@@ -197,6 +234,7 @@
     return li;
   }
 
+  const lineText = (pr) => (pr.stat === 'tds' && pr.line === 1 ? 'Anytime touchdown' : `${pr.line}+ ${pr.statLabel}`);
   const DIR = { over: ['up', '▲', 'Over'], under: ['down', '▼', 'Under'], flat: ['flat', '–', 'Neutral'], warn: ['flat', '!', 'Injury'], model: ['flat', '≈', 'Model'] };
   function why(pr, pl, v) {
     const det = el('details', 'prop-why');
@@ -205,7 +243,9 @@
       if (!det.open || det.dataset.built) return;
       det.dataset.built = '1';
       const ul = el('ul', 'evidence');
-      for (const e of pr.evidence) {
+      const shared = (state.data && state.data.shared && state.data.shared[`${pr.pid}|${pr.stat}`]) || [];
+      const evs = shared.length ? [shared[0], ...pr.evidence.filter((e) => e.dir !== 'model'), ...shared.slice(1), ...pr.evidence.filter((e) => e.dir === 'model')] : pr.evidence;
+      for (const e of evs) {
         const [dir, icon, tag] = DIR[e.dir] || DIR.flat;
         const li = el('li', 'ev'); li.dataset.dir = dir;
         const ic = el('span', 'ev-icon', icon); ic.setAttribute('aria-hidden', 'true');
@@ -244,6 +284,7 @@
     return svg;
   }
   function statValue(g, key) {
+    if (g[key] !== undefined) return g[key];
     switch (key) {
       case 'pra': return g.pts + g.reb + g.ast;
       case 'pr': return g.pts + g.reb;
@@ -336,13 +377,17 @@
   // ---------- data ----------
   async function load() {
     try {
-      const r = await fetch('/api/nba', { cache: 'no-store', redirect: 'manual' });
+      const want = league;
+      const r = await fetch(L().feed, { cache: 'no-store', redirect: 'manual' });
       if (r.type === 'opaqueredirect' || r.status === 401 || r.status === 403) { $('authBanner').hidden = false; throw new Error('signed out'); }
       if (!r.ok) throw new Error('HTTP ' + r.status);
       $('authBanner').hidden = true;
-      state.data = await r.json();
+      const data = await r.json();
+      if (want !== league) return;
+      state.data = data;
       state.loadedAt = Date.now(); state.failed = false;
-      store.set('ip.nba', state.data);
+      store.set(L().cacheKey, state.data);
+      buildChips();
       if (state.data.rulesNote) setText('rulesNote', 'Kalshi rules: ' + state.data.rulesNote);
     } catch (e) {
       state.failed = !state.data;
@@ -387,6 +432,9 @@
 
   // ---------- start ----------
   window.addEventListener('themechange', () => { document.querySelectorAll('.prop-why[open]').forEach((d) => { delete d.dataset.built; }); render(); });
+  document.querySelectorAll('.league-switch button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.league === league)));
+  setText('pageTitle', `${L().name} player props · Kalshi`);
+  buildChips();
   renderLog();
   render();
   load();

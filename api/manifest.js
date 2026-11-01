@@ -13,7 +13,7 @@ module.exports = (req, res) => {
       id: '/sports',
       name: 'Investment Sports',
       short_name: 'Sports',
-      description: 'NBA player props on Kalshi: projections from raw stats, value and evidence.',
+      description: 'NBA and NFL player props on Kalshi: projections from raw stats, value and evidence.',
       start_url: '/sports' + auth,
       scope: '/',
       display: 'standalone',

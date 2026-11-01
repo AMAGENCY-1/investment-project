@@ -399,6 +399,8 @@ details[open] .summary-icon::before { content: "\2212"; }
 .meter[data-state="warn"] i { background: var(--warn); }
 .meter[data-state="stop"] i { background: var(--down); }
 .filters { display: grid; gap: 12px; }
+.league-switch { justify-self: start; }
+.method b { color: var(--ink); font-weight: 600; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chips button { min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--ink-2); font: 500 13px/1 var(--sans); cursor: pointer; }
 .chips button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }

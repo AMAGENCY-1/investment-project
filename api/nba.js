@@ -79,7 +79,7 @@ async function injuries() {
   const map = {};
   for (const team of j.injuries || []) for (const inj of team.injuries || []) {
     const name = inj.athlete && inj.athlete.displayName;
-    if (!name) continue;
+    if (!name || /^active$/i.test(String(inj.status || '').trim())) continue;
     const d = inj.details || {};
     map[N.normName(name)] = { status: inj.status || (inj.type && inj.type.description) || 'Listed', detail: [d.type, d.returnDate ? `return ${d.returnDate}` : null].filter(Boolean).join(', ') };
   }
@@ -152,6 +152,7 @@ async function build() {
     const lg = pl.athleteId ? logs[pl.athleteId] : null;
     const pair = [N.espnAbbr(p.teams[0]), N.espnAbbr(p.teams[1])].sort().join('-');
     const gameInfo = boards[pair] || null;
+    if (gameInfo && gameInfo.state !== 'pre') continue;
     const injury = inj[N.normName(p.player)] || null;
     const oppInfo = stand[N.espnAbbr(p.opp)] || null;
     if (!rulesNote && p.rulesDetail) rulesNote = p.rulesDetail.split('\n\n').slice(0, 2).join(' ');
