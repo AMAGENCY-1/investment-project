@@ -18,6 +18,23 @@ round green (Up) or red (Down), and lists the last nine results with how far eac
 
 **Alerts**: tap *Alert me* for a chime and vibration whenever a Buy call appears; the tab title also flags it.
 
+## Sports (NBA player props) · `/sports`
+- **Data:** every open Kalshi NBA player-prop market (points, rebounds, assists, threes, PRA and other combos,
+  steals, blocks) from `/api/nba`, matched to ESPN rosters, game logs (this season and last), team defense
+  (points allowed) and the injury report. Built in about 1–2 s and cached for 90 s.
+- **Projection:** minutes (last 5 / season / last season blend) × production per minute (this season, leaning on
+  last season until ~10 games, plus recent form), nudged by opponent defense for scoring props.
+  Chance of hitting the line uses a normal model for points and combos and a negative-binomial model for counts,
+  both widened for model uncertainty.
+- **Value:** our chance vs Kalshi's ask plus fee, for both Yes and No. A suggestion only appears when the advantage
+  clears your minimum (default 6 points), the spread is 10¢ or less, the player has 15+ games of history, isn't on
+  the injury report, and the game hasn't started. Every prop shows our fair price for limit orders.
+- **Evidence:** season and last-5 averages, hit rate over the last 10, minutes trend, opponent defense, last season,
+  injury status and the model's projection, plus a last-10-games bar chart against the line.
+- **Safety:** max bet (default $2), quarter-Kelly sizing and a daily loss limit (default $10, pending bets count as
+  losses). Once reached, Buy suggestions stop until the next day.
+- **Home Screen:** `/sports` has its own icon and manifest (`/api/manifest?app=sports`), installable separately.
+
 ## Home Screen app
 - **iPhone:** open the site in Safari, tap Share, then *Add to Home Screen*. The app shows these steps itself.
   **Android / desktop Chrome:** tap *Install app* on the card, or use the browser menu.
@@ -80,5 +97,6 @@ If our odds and Kalshi's differ by more than 25 points the call is **Check data*
 | `/api/context` | 15s | spot depth, taker flow, Deribit, Hyperliquid, implied volatility, liquidations |
 | `/api/history` | once per window | Kalshi minute prices for back-fill |
 | `/api/result` | 30s | settlement of logged bets |
-| `/api/manifest` | on install | home-screen app manifest |
+| `/api/nba` | 2 min | NBA props, projections, evidence (`?summary=1` for a health summary) |
+| `/api/manifest` | on install | home-screen app manifests (`?app=sports` for Sports) |
 | `/api/health` | on demand | latency and status of every upstream, including the Coinbase stream |

@@ -145,6 +145,8 @@ async function build() {
   await pool(ids, 12, async (id) => { logs[id] = await gamelogs(id); });
 
   const out = [];
+  const people = {};
+  let rulesNote = '';
   for (const p of props) {
     const pl = players[p.pid];
     const lg = pl.athleteId ? logs[pl.athleteId] : null;
@@ -152,19 +154,28 @@ async function build() {
     const gameInfo = boards[pair] || null;
     const injury = inj[N.normName(p.player)] || null;
     const oppInfo = stand[N.espnAbbr(p.opp)] || null;
-    const base = { ...p, start: gameInfo ? gameInfo.start : null, state: gameInfo ? gameInfo.state : 'pre', stateDetail: gameInfo ? gameInfo.detail : '',
-      home: gameInfo ? gameInfo.home === N.espnAbbr(p.team) : null, injury };
-    delete base.teams;
-    if (!lg) { out.push({ ...base, chance: null, reason: 'No ESPN stats found for this player.' }); continue; }
+    if (!rulesNote && p.rulesDetail) rulesNote = p.rulesDetail.split('\n\n').slice(0, 2).join(' ');
+    // Player-level facts are sent once; props carry only what depends on the line.
+    if (!people[p.pid]) {
+      people[p.pid] = {
+        name: p.player, team: p.team, opp: p.opp, game: p.game, injury,
+        start: gameInfo ? gameInfo.start : null, state: gameInfo ? gameInfo.state : 'pre', stateDetail: gameInfo ? gameInfo.detail : '',
+        home: gameInfo ? gameInfo.home === N.espnAbbr(p.team) : null,
+        games: lg ? lg.cur.length + lg.prev.length : 0, gamesCur: lg ? lg.cur.length : 0,
+        recent: lg ? lg.cur.concat(lg.prev).slice(0, 10).map((g) => ({ d: g.date, o: g.opp, m: g.min, pts: g.pts, reb: g.reb, ast: g.ast, fg3: g.fg3, stl: g.stl, blk: g.blk })) : [],
+      };
+    }
+    const base = { ticker: p.ticker, pid: p.pid, stat: p.stat, statLabel: p.statLabel, statShort: p.statShort, line: p.line,
+      yesBid: p.yesBid, yesAsk: p.yesAsk, noBid: p.noBid, noAsk: p.noAsk, volume: p.volume, close: p.close, chance: null };
+    if (!lg) { out.push({ ...base, reason: 'No ESPN stats found for this player.' }); continue; }
     const proj = N.project(lg.cur, lg.prev, p.stat, N.SCORING.has(p.stat) && oppInfo ? oppInfo.factor : 1);
-    if (!proj) { out.push({ ...base, chance: null, reason: 'Fewer than 5 games of data.' }); continue; }
+    if (!proj) { out.push({ ...base, reason: 'Fewer than 5 games of data.' }); continue; }
     base.chance = N.chanceAtLeast(p.line, proj, p.kind);
-    base.mu = proj.mu; base.minutes = proj.minutes; base.games = proj.n; base.gamesCur = lg.cur.length;
-    base.evidence = N.evidence(base, lg.cur, lg.prev, proj, oppInfo, injury);
-    base.recent = lg.cur.concat(lg.prev).slice(0, 10).map((g) => ({ d: g.date, o: g.opp, v: N.statOf(g, p.stat), m: g.min }));
+    base.mu = proj.mu; base.minutes = proj.minutes;
+    base.evidence = N.evidence({ ...p, chance: base.chance }, lg.cur, lg.prev, proj, oppInfo, injury);
     out.push(base);
   }
-  return { generatedAt: Date.now(), props: out, playersMatched: ids.length, playersTotal: Object.keys(players).length, errors };
+  return { generatedAt: Date.now(), props: out, players: people, rulesNote, playersMatched: ids.length, playersTotal: Object.keys(players).length, errors };
 }
 
 module.exports = async (req, res) => {
@@ -177,7 +188,7 @@ module.exports = async (req, res) => {
     const r = cache.resp, ok = r.props.filter((p) => p.chance !== null);
     return send(res, { playersMatched: r.playersMatched, playersTotal: r.playersTotal, props: r.props.length, withChance: ok.length,
       bySeries: r.props.reduce((t, p) => ({ ...t, [p.series]: (t[p.series] || 0) + 1 }), {}), unmatched: r.props.filter((p) => p.chance === null).slice(0, 8).map((p) => [p.player, p.team, p.reason]),
-      sample: ok.slice(0, 2), errors: r.errors, buildMs: r.buildMs }, 0);
+      sample: ok.slice(0, 2), bytes: JSON.stringify(r).length, errors: r.errors, buildMs: r.buildMs }, 0);
   }
   send(res, { serverTime: Date.now(), ...cache.resp }, 60);
 };

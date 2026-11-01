@@ -8,6 +8,30 @@ module.exports = (req, res) => {
   if (!allowGet(req, res)) return;
   const token = process.env.HOME_SCREEN_SHARE || '';
   const auth = /^[A-Za-z0-9]{20,64}$/.test(token) ? `?_vercel_share=${token}` : '';
+  const sports = req.query && req.query.app === 'sports';
+  if (sports) {
+    res.setHeader('content-type', 'application/manifest+json; charset=utf-8');
+    res.setHeader('cache-control', 'private, no-store');
+    return res.end(JSON.stringify({
+      id: '/sports',
+      name: 'Investment Sports',
+      short_name: 'Sports',
+      description: 'NBA player props on Kalshi: projections from raw stats, value and evidence.',
+      start_url: '/sports' + auth,
+      scope: '/',
+      display: 'standalone',
+      orientation: 'portrait',
+      background_color: '#0D0E12',
+      theme_color: '#0D0E12',
+      categories: ['sports', 'finance'],
+      icons: [
+        { src: '/icon-sports-192.png', sizes: '192x192', type: 'image/png' },
+        { src: '/icon-sports-512.png', sizes: '512x512', type: 'image/png' },
+        { src: '/icon-sports-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        { src: '/icon-sports.svg', sizes: 'any', type: 'image/svg+xml' },
+      ],
+    }));
+  }
   const manifest = {
     id: '/',
     name: 'Investment Project',

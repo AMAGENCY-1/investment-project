@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sports · Investment Project</title>
+<meta name="description" content="NBA player props on Kalshi: projections from raw stats, value and evidence.">
+<meta name="theme-color" content="#0D0E12">
+<meta name="robots" content="noindex, nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sports">
+<link rel="icon" href="/icon-sports.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon-sports.png">
+<link rel="manifest" href="/api/manifest?app=sports" crossorigin="use-credentials">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+<script src="/theme.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="bar">
+  <div class="bar-inner">
+    <a class="brand" href="/" aria-label="Investment Project, AMAGENCY. Go to the desk">
+      <span class="brand-eyebrow" aria-hidden="true">AMAGENCY</span>
+      <span class="brand-name" aria-hidden="true">Investment <em>Project</em></span>
+    </a>
+    <div class="bar-tools">
+      <nav class="nav" aria-label="Main">
+        <a href="/">Desk</a>
+        <a href="/sports" aria-current="page">Sports</a>
+        <a href="/status">Status</a>
+      </nav>
+      <div class="status" id="status" data-state="connecting" title="When the props were last updated"><i aria-hidden="true"></i><span id="statusText">Loading</span></div>
+      <button type="button" class="theme-btn" id="themeBtn" aria-label="Theme: Auto. Switch theme"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.75a6.25 6.25 0 0 1 0 12.5z" fill="currentColor"/></svg><span class="theme-label">Auto</span></button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap" id="main" tabindex="-1">
+  <section class="hero sports-hero" aria-labelledby="pageTitle">
+    <div class="hero-meta">
+      <h1 class="eyebrow" id="pageTitle">NBA player props · Kalshi</h1>
+      <span class="window" id="slateLabel">Loading tonight's slate…</span>
+    </div>
+    <p class="sports-lede">Our projections from raw ESPN stats, compared with Kalshi's prices. Most props are fairly priced; the few that aren't rise to the top.</p>
+    <dl class="ticket" id="slateStats">
+      <div><dt>Props</dt><dd id="kProps">–</dd></div>
+      <div><dt>Games</dt><dd id="kGames">–</dd></div>
+      <div><dt>Good value</dt><dd id="kGood">–</dd></div>
+      <div><dt>Today</dt><dd id="kToday">$0.00</dd></div>
+    </dl>
+    <div class="meter" id="limitMeter" aria-hidden="true"><i id="limitFill"></i></div>
+    <p class="hint" id="limitText">Daily loss limit: $10. Buy suggestions stop once it's reached.</p>
+  </section>
+
+  <div class="auth-banner" id="authBanner" role="alert" hidden>
+    <span>Your sign-in has expired, so data paused.</span>
+    <a class="btn btn-up" href="/sports">Sign in again</a>
+  </div>
+
+  <section class="card install" id="install" aria-labelledby="installTitle" hidden>
+    <div class="install-row">
+      <img src="/apple-touch-icon-sports.png" alt="" width="52" height="52" class="install-icon">
+      <div class="install-text">
+        <h2 id="installTitle">Put Sports on your Home Screen</h2>
+        <p class="hint" id="installSub">Its own icon, opens full screen, already signed in.</p>
+      </div>
+    </div>
+    <ol class="steps" id="installSteps" hidden>
+      <li>Tap <b>Share</b> <svg class="share-ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 1.5 5.2 4.3l.9.9L7.4 3.9V10h1.2V3.9l1.3 1.3.9-.9L8 1.5zM3.5 6.5v7h9v-7h-2v1.2h.8v4.6H4.7V7.7h.8V6.5h-2z" fill="currentColor"/></svg> (bottom of Safari, or top right in Chrome).</li>
+      <li>Scroll down and tap <b>Add to Home Screen</b>.</li>
+      <li>Tap <b>Add</b>. The Sports icon opens straight to these props.</li>
+    </ol>
+    <div class="row-actions">
+      <button type="button" class="btn btn-up" id="installBtn" hidden>Install app</button>
+      <button type="button" class="link" id="installLater">Not now</button>
+    </div>
+  </section>
+
+  <section class="card filters" aria-label="Filter props">
+    <div class="chips" role="group" aria-label="Stat" id="statChips">
+      <button type="button" data-stat="all" aria-pressed="true">All</button>
+      <button type="button" data-stat="pts" aria-pressed="false">Points</button>
+      <button type="button" data-stat="reb" aria-pressed="false">Rebounds</button>
+      <button type="button" data-stat="ast" aria-pressed="false">Assists</button>
+      <button type="button" data-stat="fg3" aria-pressed="false">Threes</button>
+      <button type="button" data-stat="combo" aria-pressed="false">Combos</button>
+      <button type="button" data-stat="def" aria-pressed="false">Steals &amp; blocks</button>
+    </div>
+    <div class="filter-row">
+      <label for="gameSel" class="sr-only">Game</label>
+      <select id="gameSel"><option value="all">All games</option></select>
+      <label for="search" class="sr-only">Search players</label>
+      <input id="search" type="search" placeholder="Search players" autocomplete="off">
+    </div>
+    <label class="toggle" for="goodOnly"><input type="checkbox" id="goodOnly"> Only show good value</label>
+  </section>
+
+  <section aria-labelledby="listTitle">
+    <div class="card-head list-head">
+      <h2 id="listTitle">Best value first</h2>
+      <span class="hint" id="listHint"></span>
+    </div>
+    <ul class="props" id="props" aria-live="off"></ul>
+    <p class="empty" id="propsEmpty" hidden></p>
+    <button type="button" class="btn btn-ghost more" id="more" hidden>Show more</button>
+  </section>
+
+  <div class="grid">
+    <div class="col">
+      <section class="card" aria-labelledby="logTitle">
+        <div class="card-head">
+          <h2 id="logTitle">Sports bet log</h2>
+          <button type="button" class="info-btn" aria-expanded="false" aria-controls="xLog" aria-label="What this shows">?</button>
+        </div>
+        <p class="explain" id="xLog" hidden>Log a bet from a prop's <b>Why</b> panel after you place it in Kalshi. Results fill in once the game is settled. Today's losses count toward your daily limit.</p>
+        <dl class="facts" id="logSummary">
+          <div><dt>Bets</dt><dd id="sBets">0</dd></div>
+          <div><dt>Won</dt><dd id="sWin">–</dd></div>
+          <div><dt>Profit</dt><dd id="sPnl">$0.00</dd></div>
+          <div><dt>Expected</dt><dd id="sExp">$0.00</dd></div>
+        </dl>
+        <div class="table-scroll">
+          <table class="log" id="logTable">
+            <caption class="sr-only">Logged sports bets, newest first</caption>
+            <thead><tr><th scope="col">Prop</th><th scope="col">Side</th><th scope="col">Price</th><th scope="col">Bet</th><th scope="col">Result</th></tr></thead>
+            <tbody id="logBody"></tbody>
+          </table>
+        </div>
+        <p class="empty" id="logEmpty">No sports bets logged yet.</p>
+        <div class="clear-row">
+          <button type="button" class="link" id="clearLog">Clear log</button>
+          <span id="clearConfirm" hidden>Delete every logged sports bet? <button type="button" class="link danger" id="clearYes">Delete</button> <button type="button" class="link" id="clearNo">Keep</button></span>
+        </div>
+      </section>
+    </div>
+    <div class="col">
+      <section class="card" aria-labelledby="setTitle">
+        <details id="settings">
+          <summary><span class="summary-text"><h2 id="setTitle">Settings</h2><span class="hint">Bankroll, bet cap, daily limit</span></span><span class="summary-icon" aria-hidden="true"></span></summary>
+          <form class="settings" id="settingsForm" novalidate>
+            <label for="sBank">Bankroll ($)<input id="sBank" type="number" inputmode="decimal" min="1" step="1" value="10"></label>
+            <label for="sMaxBet">Max bet ($)<input id="sMaxBet" type="number" inputmode="decimal" min="0.5" step="0.5" value="2" aria-describedby="hMax"><span class="help" id="hMax">No suggestion ever goes above this.</span></label>
+            <label for="sLimit">Daily loss limit ($)<input id="sLimit" type="number" inputmode="decimal" min="1" step="1" value="10" aria-describedby="hLimit"><span class="help" id="hLimit">Once today's logged losses reach this, Buy suggestions stop until tomorrow.</span></label>
+            <label for="sMinEdge">Minimum advantage (points)<input id="sMinEdge" type="number" inputmode="decimal" min="0" max="50" step="0.5" value="6"></label>
+            <label for="sFee">Kalshi fee rate<input id="sFee" type="number" inputmode="decimal" min="0" max="0.2" step="0.005" value="0.07"></label>
+          </form>
+        </details>
+      </section>
+      <section class="card rules" aria-labelledby="howTitle">
+        <details>
+          <summary><span class="summary-text"><h2 id="howTitle">How the projections work</h2><span class="hint">Method, rules and limits</span></span><span class="summary-icon" aria-hidden="true"></span></summary>
+          <ul class="method">
+            <li>Minutes: a blend of the last 5 games, this season and last season.</li>
+            <li>Production per minute: this season, leaning on last season until about 10 games are played, plus recent form.</li>
+            <li>Opponent: scoring props are nudged by how many points the opponent allows.</li>
+            <li>Chance of hitting the line: from the player's own game-to-game swings, with extra room for uncertainty.</li>
+            <li>Suggestions only show when the advantage clears your minimum, the market isn't too thin (spread of 10¢ or less), the player isn't on the injury report, and the game hasn't started.</li>
+          </ul>
+          <p class="note" id="rulesNote"></p>
+          <p class="note">Props are high-variance: one game is a small sample, and Kalshi's prices already include most public stats. Treat suggestions as a short list to check, not a sure thing.</p>
+        </details>
+      </section>
+    </div>
+  </div>
+
+  <footer class="site-foot">
+    <span>AMAGENCY · Investment Project · Sports · <button type="button" class="link inline" id="installOpen">Add to Home Screen</button></span>
+    <span>Stats: ESPN · Prices: Kalshi</span>
+  </footer>
+</main>
+
+<div class="tip" id="tip" hidden></div>
+<script src="/sports.js" defer></script>
+</body>
+</html>
