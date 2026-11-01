@@ -1,25 +1,33 @@
-// TEMPORARY: finds which Kalshi NBA player-stat markets are open. Preview branch only.
-const H = { 'User-Agent': 'investment-project probe', Accept: 'application/json' };
-const K = 'https://api.elections.kalshi.com/trade-api/v2';
+// TEMPORARY: shape of ESPN NBA data (preview branch only).
+const H = { 'User-Agent': 'Mozilla/5.0 (investment-project probe)', Accept: 'application/json' };
 const j = async (u) => (await fetch(u, { headers: H, signal: AbortSignal.timeout(8000) })).json();
+const shape = (o, depth = 0) => {
+  if (Array.isArray(o)) return o.length ? [shape(o[0], depth + 1), `len=${o.length}`] : [];
+  if (o && typeof o === 'object') { if (depth > 4) return '{…}'; const r = {}; for (const k of Object.keys(o).slice(0, 25)) r[k] = shape(o[k], depth + 1); return r; }
+  return typeof o === 'string' ? o.slice(0, 40) : o;
+};
 module.exports = async (req, res) => {
   const out = {};
-  const all = (await j(K + '/series?category=Sports')).series || [];
-  const nba = all.filter((s) => /^KXNBA/.test(s.ticker) && /PTS|REB|AST|3PT|PRA|STL|BLK|PLAYER|THREE|POINT|REBOUND|ASSIST|DOUBLE/i.test(s.ticker + ' ' + s.title));
-  out.candidates = nba.map((s) => [s.ticker, s.title]);
-  out.open = [];
-  await Promise.all(nba.map(async (s) => {
-    try {
-      const m = (await j(`${K}/markets?series_ticker=${s.ticker}&status=open&limit=200`)).markets || [];
-      if (!m.length) return;
-      const x = m[0];
-      out.open.push({ series: s.ticker, title: s.title, count: m.length,
-        sample: { ticker: x.ticker, event: x.event_ticker, title: x.title, yes: x.yes_sub_title, no: x.no_sub_title, strike: x.floor_strike, type: x.strike_type,
-          bid: x.yes_bid_dollars, ask: x.yes_ask_dollars, vol: x.volume_fp, oi: x.open_interest_fp, close: x.close_time, occ: x.occurrence_datetime, cs: x.custom_strike, rules: (x.rules_primary || '').slice(0, 220) } });
-    } catch (e) { /* skip */ }
-  }));
-  out.open.sort((a, b) => b.count - a.count);
-  res.setHeader('content-type', 'application/json');
-  res.setHeader('cache-control', 'no-store');
+  const gl = await j('https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/3112335/gamelog');
+  out.gamelogKeys = Object.keys(gl);
+  out.labels = gl.labels; out.names = gl.names;
+  out.seasonTypes = shape(gl.seasonTypes);
+  const evKeys = Object.keys(gl.events || {});
+  out.eventsCount = evKeys.length;
+  out.eventSample = gl.events && gl.events[evKeys[0]];
+  const gl2 = await j('https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/3112335/gamelog?season=2026');
+  out.prevSeasonEvents = Object.keys(gl2.events || {}).length;
+  const teams = await j('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams');
+  const t = teams.sports[0].leagues[0].teams.map((x) => [x.team.id, x.team.abbreviation, x.team.displayName]);
+  out.teams = t;
+  const roster = await j('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/12/roster');
+  out.rosterShape = shape(roster.athletes);
+  const st = await j('https://site.api.espn.com/apis/v2/sports/basketball/nba/standings');
+  const e0 = st.children && st.children[0].standings.entries[0];
+  out.standingsTeam = e0 && e0.team && [e0.team.abbreviation, e0.team.id];
+  out.standingsStats = e0 && e0.stats.map((s) => [s.name, s.value]).slice(0, 40);
+  const inj = await j('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/injuries');
+  out.injShape = shape(inj.injuries && inj.injuries[0]);
+  res.setHeader('content-type', 'application/json'); res.setHeader('cache-control', 'no-store');
   res.end(JSON.stringify(out, null, 1));
 };
