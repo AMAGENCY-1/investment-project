@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Investment">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<link rel="manifest" href="/manifest.webmanifest">
+<link rel="manifest" href="/api/manifest" crossorigin="use-credentials">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
@@ -87,7 +87,7 @@
       <section class="card" aria-labelledby="secTitle">
         <div class="card-head"><h2 id="secTitle">Security</h2></div>
         <ul class="shield">
-          <li><span class="tick" aria-hidden="true">✓</span><span><b>Private access</b><span class="d">Only signed-in members of the AMAGENCY Vercel team can open the app or its data.</span></span></li>
+          <li><span class="tick" aria-hidden="true">✓</span><span><b>Private access</b><span class="d">Only signed-in members of the AMAGENCY Vercel team can open the app or its data. The Home Screen app opens with a private link that's stored as an encrypted secret and can be revoked anytime in Vercel.</span></span></li>
           <li><span class="tick" aria-hidden="true">✓</span><span><b>Locked-down pages</b><span class="d">Content Security Policy allows code from this site only and connections to this site and the Coinbase stream. No framing, no referrer, no camera, microphone or location.</span></span></li>
           <li><span class="tick" aria-hidden="true">✓</span><span><b>Encrypted everywhere</b><span class="d">HTTPS with HSTS preload on every request; the price stream is a secure WebSocket.</span></span></li>
           <li><span class="tick" aria-hidden="true">✓</span><span><b>Read-only by design</b><span class="d">Public market data only. No API keys, no account access, no third-party scripts or packages.</span></span></li>

@@ -211,8 +211,10 @@
     livePending = true;
     const t0 = Date.now();
     try {
-      const r = await fetch('/api/live', { cache: 'no-store' });
+      const r = await fetch('/api/live', { cache: 'no-store', redirect: 'manual' });
+      if (r.type === 'opaqueredirect' || r.status === 401 || r.status === 403) { $('authBanner').hidden = false; throw new Error('signed out'); }
       if (!r.ok) throw new Error('HTTP ' + r.status);
+      $('authBanner').hidden = true;
       const j = await r.json();
       const rtt = Date.now() - t0;
       state.rtt = rtt;
@@ -1392,6 +1394,43 @@
     $('guideTitle').setAttribute('tabindex', '-1');
     $('guideTitle').focus({ preventScroll: true });
   });
+
+  // ---------- Home Screen ----------
+  // Remove the private sign-in link from the address once the server has used it.
+  if (/[?&]_vercel_share=/.test(location.search)) history.replaceState(null, '', location.pathname + location.hash);
+  const standalone = () => (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+  const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  let installEvt = null;
+  function syncInstall(force) {
+    const card = $('install');
+    if (standalone()) { card.hidden = true; $('installOpen').hidden = true; return; }
+    $('installOpen').hidden = false;
+    const canPrompt = !!installEvt;
+    $('installBtn').hidden = !canPrompt;
+    $('installSteps').hidden = canPrompt || !isIOS;
+    setText('installSub', canPrompt || isIOS
+      ? 'Opens full screen like an app, already signed in.'
+      : 'Open your browser menu and choose Install app or Add to Home Screen. It opens full screen, already signed in.');
+    if (force) card.hidden = false;
+    else card.hidden = store.get('ip.install', null) === 'later';
+  }
+  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvt = e; syncInstall(); });
+  window.addEventListener('appinstalled', () => { installEvt = null; $('install').hidden = true; setText('announce', 'Installed. Open Investment Project from your Home Screen.'); });
+  $('installBtn').addEventListener('click', async () => {
+    if (!installEvt) return;
+    installEvt.prompt();
+    try { await installEvt.userChoice; } catch { /* dismissed */ }
+    installEvt = null;
+    syncInstall();
+  });
+  $('installLater').addEventListener('click', () => { store.set('ip.install', 'later'); $('install').hidden = true; $('main').focus(); });
+  $('installOpen').addEventListener('click', () => {
+    syncInstall(true);
+    $('install').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    $('installTitle').setAttribute('tabindex', '-1');
+    $('installTitle').focus({ preventScroll: true });
+  });
+  syncInstall();
 
   Object.keys(CHARTS).forEach((id) => chartObserver && chartObserver.observe($(id)));
   bindSettings();

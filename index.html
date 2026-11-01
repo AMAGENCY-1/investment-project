@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Investment">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<link rel="manifest" href="/manifest.webmanifest">
+<link rel="manifest" href="/api/manifest" crossorigin="use-credentials">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
@@ -74,6 +74,30 @@
     <div class="view-switch" role="group" aria-label="Detail level">
       <button type="button" id="viewSimple" aria-pressed="true">Simple</button>
       <button type="button" id="viewPro" aria-pressed="false">Pro</button>
+    </div>
+  </section>
+
+  <div class="auth-banner" id="authBanner" role="alert" hidden>
+    <span>Your sign-in has expired, so live data paused.</span>
+    <a class="btn btn-up" href="/">Sign in again</a>
+  </div>
+
+  <section class="card install" id="install" aria-labelledby="installTitle" hidden>
+    <div class="install-row">
+      <img src="/apple-touch-icon.png" alt="" width="52" height="52" class="install-icon">
+      <div class="install-text">
+        <h2 id="installTitle">Put it on your Home Screen</h2>
+        <p class="hint" id="installSub">Opens full screen like an app, already signed in.</p>
+      </div>
+    </div>
+    <ol class="steps" id="installSteps" hidden>
+      <li>Tap <b>Share</b> <svg class="share-ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 1.5 5.2 4.3l.9.9L7.4 3.9V10h1.2V3.9l1.3 1.3.9-.9L8 1.5zM3.5 6.5v7h9v-7h-2v1.2h.8v4.6H4.7V7.7h.8V6.5h-2z" fill="currentColor"/></svg> (bottom of Safari, or top right in Chrome).</li>
+      <li>Scroll down and tap <b>Add to Home Screen</b>.</li>
+      <li>Tap <b>Add</b>. From now on, open it from your Home Screen.</li>
+    </ol>
+    <div class="row-actions">
+      <button type="button" class="btn btn-up" id="installBtn" hidden>Install app</button>
+      <button type="button" class="link" id="installLater">Not now</button>
     </div>
   </section>
 
@@ -328,7 +352,7 @@
     </details>
   </section>
   <footer class="site-foot">
-    <span>AMAGENCY · Investment Project · Private · <button type="button" class="link inline" id="guideOpen">Show the guide</button></span>
+    <span>AMAGENCY · Investment Project · Private · <button type="button" class="link inline" id="guideOpen">Show the guide</button> · <button type="button" class="link inline" id="installOpen">Add to Home Screen</button></span>
     <span>Market data: Kalshi, Coinbase, Kraken, Bitstamp, Gemini, Deribit, Hyperliquid</span>
   </footer>
 </main>

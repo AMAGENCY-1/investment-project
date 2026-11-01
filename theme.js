@@ -11,6 +11,10 @@
   apply(get());
   // Detail level (Simple / Pro), applied early so Pro panels never flash.
   try { if (localStorage.getItem('ip.view') === 'pro') document.documentElement.setAttribute('data-view', 'pro'); } catch (e) { /* default Simple */ }
+  // Offline support for the home-screen app.
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    window.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js').catch(function () {}); });
+  }
   document.addEventListener('DOMContentLoaded', function () {
     var btn = document.getElementById('themeBtn');
     function sync(mode) {

@@ -18,6 +18,16 @@ round green (Up) or red (Down), and lists the last nine results with how far eac
 
 **Alerts**: tap *Alert me* for a chime and vibration whenever a Buy call appears; the tab title also flags it.
 
+## Home Screen app
+- **iPhone:** open the site in Safari, tap Share, then *Add to Home Screen*. The app shows these steps itself.
+  **Android / desktop Chrome:** tap *Install app* on the card, or use the browser menu.
+- The manifest is served by `/api/manifest` (behind Vercel Authentication) with a start URL that carries the
+  project's private Vercel shareable link, stored as the encrypted `HOME_SCREEN_SHARE` environment variable.
+  iPhone home-screen apps keep their own cookies, so this signs the app in on every launch.
+  To cut off home-screen access, revoke the shareable link in Vercel (Deployment Protection) and update the variable.
+- `sw.js` keeps a copy of the look and shows `offline.html` when there's no signal. Live data is never cached.
+- If sign-in ever expires, the desk shows a *Sign in again* banner instead of silently stalling.
+
 ## What it shows
 - **The call**: Buy Up, Buy Down, Skip or Check data, with stake, contracts and edge.
 - **Our odds vs Kalshi**: model probability, Kalshi ask, fee, edge, fair vs Kalshi payout, buyable depth.
@@ -70,4 +80,5 @@ If our odds and Kalshi's differ by more than 25 points the call is **Check data*
 | `/api/context` | 15s | spot depth, taker flow, Deribit, Hyperliquid, implied volatility, liquidations |
 | `/api/history` | once per window | Kalshi minute prices for back-fill |
 | `/api/result` | 30s | settlement of logged bets |
+| `/api/manifest` | on install | home-screen app manifest |
 | `/api/health` | on demand | latency and status of every upstream, including the Coinbase stream |
