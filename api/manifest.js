@@ -1,17 +1,14 @@
-// Web app manifest for "Add to Home Screen". Served dynamically (and only to
-// signed-in visitors, behind Vercel Authentication) so the home-screen app can
-// start with the private share link: an iPhone home-screen app keeps its own
-// cookies, separate from Safari, so this signs it in on every launch.
+// Web app manifests for "Add to Home Screen": the Desk (default) and Sports
+// (?app=sports). The app is public, so no sign-in link is needed.
 const { allowGet } = require('./_lib');
 
 module.exports = (req, res) => {
   if (!allowGet(req, res)) return;
-  const token = process.env.HOME_SCREEN_SHARE || '';
-  const auth = /^[A-Za-z0-9]{20,64}$/.test(token) ? `?_vercel_share=${token}` : '';
+  const auth = '';
   const sports = req.query && req.query.app === 'sports';
   if (sports) {
     res.setHeader('content-type', 'application/manifest+json; charset=utf-8');
-    res.setHeader('cache-control', 'private, no-store');
+    res.setHeader('cache-control', 'public, max-age=0, s-maxage=3600');
     return res.end(JSON.stringify({
       id: '/sports',
       name: 'Investment Sports',
@@ -56,6 +53,6 @@ module.exports = (req, res) => {
     ],
   };
   res.setHeader('content-type', 'application/manifest+json; charset=utf-8');
-  res.setHeader('cache-control', 'private, no-store');
+  res.setHeader('cache-control', 'public, max-age=0, s-maxage=3600');
   res.end(JSON.stringify(manifest));
 };

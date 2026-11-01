@@ -1,6 +1,6 @@
 # Investment Project
 
-Private AMAGENCY tool: live odds, liquidity and edge for Kalshi's **BTC 15-minute** markets (series `KXBTC15M`).
+AMAGENCY tool: live odds, liquidity and edge for Kalshi's **BTC 15-minute** markets (series `KXBTC15M`).
 It has its own GitHub repo and its own Vercel project (`investment-project`), separate from every client project.
 
 ## Simple and Pro
@@ -38,12 +38,11 @@ round green (Up) or red (Down), and lists the last nine results with how far eac
 ## Home Screen app
 - **iPhone:** open the site in Safari, tap Share, then *Add to Home Screen*. The app shows these steps itself.
   **Android / desktop Chrome:** tap *Install app* on the card, or use the browser menu.
-- The manifest is served by `/api/manifest` (behind Vercel Authentication) with a start URL that carries the
-  project's private Vercel shareable link, stored as the encrypted `HOME_SCREEN_SHARE` environment variable.
-  iPhone home-screen apps keep their own cookies, so this signs the app in on every launch.
-  To cut off home-screen access, revoke the shareable link in Vercel (Deployment Protection) and update the variable.
+- Manifests are served by `/api/manifest` (Desk) and `/api/manifest?app=sports` (Sports).
+  The app is public, so no sign-in link is used. If production is ever made private again, home-screen apps need a
+  signed-in start URL (see git history for the shareable-link approach) and the old link should be rotated.
 - `sw.js` keeps a copy of the look and shows `offline.html` when there's no signal. Live data is never cached.
-- If sign-in ever expires, the desk shows a *Sign in again* banner instead of silently stalling.
+- If the app is ever made private and sign-in expires, the pages show a *Sign in again* banner instead of stalling.
 
 ## What it shows
 - **The call**: Buy Up, Buy Down, Skip or Check data, with stake, contracts and edge.
@@ -71,7 +70,8 @@ round green (Up) or red (Down), and lists the last nine results with how far eac
 - The header shows the live round-trip time. If the stream drops, the app falls back to 1-second polling and reconnects.
 
 ## Security
-- Vercel Authentication: only signed-in members of the AMAGENCY Vercel team can open the app or its API.
+- Public and read-only: anyone with the link can view production. Preview deployments stay behind Vercel Authentication.
+  Pages and API send `noindex`, and API responses are CDN-cached (1–90 s) so public traffic can't overload upstream sources.
 - Strict headers on every response: Content-Security-Policy (scripts from this site only; connections only to this
   site and the Coinbase stream), no framing, no referrer, no camera/mic/location, nosniff, HSTS.
 - Read-only API: GET/HEAD only, inputs validated. No API keys, no accounts, no third-party scripts, no dependencies.

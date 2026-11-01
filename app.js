@@ -1409,8 +1409,8 @@
     $('installBtn').hidden = !canPrompt;
     $('installSteps').hidden = canPrompt || !isIOS;
     setText('installSub', canPrompt || isIOS
-      ? 'Opens full screen like an app, already signed in.'
-      : 'Open your browser menu and choose Install app or Add to Home Screen. It opens full screen, already signed in.');
+      ? 'Opens full screen like an app.'
+      : 'Open your browser menu and choose Install app or Add to Home Screen. It opens full screen like an app.');
     if (force) card.hidden = false;
     else card.hidden = store.get('ip.install', null) === 'later';
   }

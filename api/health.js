@@ -37,5 +37,5 @@ module.exports = async (req, res) => {
     timed('Deribit', async () => (await getJSON('https://www.deribit.com/api/v2/public/ticker?instrument_name=BTC-PERPETUAL')).result.index_price),
     timed('Hyperliquid', async () => { const r = await getJSON('https://api.hyperliquid.xyz/info', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'allMids' }) }); return r.BTC; }),
   ]);
-  send(res, { ok: checks.every((c) => c.ok), region: process.env.VERCEL_REGION || null, checks }, 0);
+  send(res, { ok: checks.every((c) => c.ok), region: process.env.VERCEL_REGION || null, checks }, 15);
 };
